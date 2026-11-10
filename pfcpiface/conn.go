@@ -132,10 +132,12 @@ func (pConn *PFCPConn) startHeartBeatMonitor() {
 
 // NewPFCPConn creates a connected UDP socket to the rAddr PFCP peer specified.
 // buf is the first message received from the peer, nil if we are initiating.
+// It returns nil, and registers nothing, if the socket cannot be created.
 func (node *PFCPNode) NewPFCPConn(lAddr, rAddr string, buf []byte) *PFCPConn {
 	conn, err := reuse.Dial("udp", lAddr, rAddr)
 	if err != nil {
-		logger.PfcpLog.Errorln("dial socket failed", err)
+		logger.PfcpLog.Errorf("failed to create PFCPConn from %s to %s: %v", lAddr, rAddr, err)
+		return nil
 	}
 
 	ts := recoveryTS{
