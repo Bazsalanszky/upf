@@ -32,10 +32,15 @@ type PFCPNode struct {
 	metrics metrics.InstrumentPFCP
 }
 
+// pfcpAddr joins host with the PFCP port. host is an IP literal, a name, or empty for
+// every local address. An IPv6 literal comes out bracketed, as Listen and Dial expect.
+func pfcpAddr(host string) string {
+	return net.JoinHostPort(host, PFCPPort)
+}
+
 // NewPFCPNode create a new PFCPNode listening on local address.
 func NewPFCPNode(upf *upf) *PFCPNode {
-	conn, err := reuse.ListenPacket("udp",
-		upf.n4addr+":"+PFCPPort)
+	conn, err := reuse.ListenPacket("udp", pfcpAddr(upf.n4addr))
 	if err != nil {
 		logger.PfcpLog.Fatalln("listen UDP failed", err)
 	}
@@ -57,22 +62,37 @@ func NewPFCPNode(upf *upf) *PFCPNode {
 	}
 }
 
+// resolveN4Peer returns the address of the PFCP endpoint of a configured N4 peer. A UDP
+// dial sends nothing; it only resolves the peer and picks the route to it.
+func resolveN4Peer(ctx context.Context, peer string) (*net.UDPAddr, error) {
+	var d net.Dialer
+
+	conn, err := d.DialContext(ctx, "udp", pfcpAddr(peer))
+	if err != nil {
+		return nil, err
+	}
+
+	remoteAddr := conn.RemoteAddr().(*net.UDPAddr)
+	conn.Close()
+
+	return remoteAddr, nil
+}
+
 func (node *PFCPNode) tryConnectToN4Peers(lAddrStr string) {
 	for _, peer := range node.upf.peers {
-		var d net.Dialer
-		conn, err := d.DialContext(node.ctx, "udp", peer+":"+PFCPPort)
+		remoteAddr, err := resolveN4Peer(node.ctx, peer)
 		if err != nil {
-			logger.PfcpLog.Warnln("failed to establish PFCP connection to peer", peer)
+			logger.PfcpLog.Warnln("failed to establish PFCP connection to peer", peer, err)
 			continue
 		}
 
-		remoteAddr := conn.RemoteAddr().(*net.UDPAddr)
-		conn.Close()
 		n4DstIP := remoteAddr.IP
 
 		logger.PfcpLog.Infof("Establishing PFCP Conn with CP node. SPGWC/SMF host: %s, CP node: %s", peer, n4DstIP.String())
 
-		pfcpConn := node.NewPFCPConn(lAddrStr, n4DstIP.String()+":"+PFCPPort, nil)
+		// remoteAddr.String() is the form handleNewPeers keys pConns by, and brackets an
+		// IPv6 address.
+		pfcpConn := node.NewPFCPConn(lAddrStr, remoteAddr.String(), nil)
 		if pfcpConn != nil {
 			go pfcpConn.sendAssociationRequest()
 		}
