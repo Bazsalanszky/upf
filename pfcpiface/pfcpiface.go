@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"flag"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -51,7 +52,7 @@ func NewPFCPIface(conf Conf) *PFCPIface {
 		httpPort = conf.CPIface.HTTPPort
 	}
 
-	pfcpIface.httpEndpoint = ":" + httpPort
+	pfcpIface.httpEndpoint = net.JoinHostPort("", httpPort)
 
 	pfcpIface.upf = NewUPF(&conf, pfcpIface.fp)
 
