@@ -322,12 +322,14 @@ type pdr struct {
 	hasChooseID bool
 }
 
+// needAllocIP reports whether a UE IP Address IE asks the UP function to choose the UE's
+// IPv4 address. That is the CHV4 flag alone (TS 29.244 clause 8.2.62, octet 5 bit 5):
+// with it the IE carries no IPv4 address. V4 shall not be set beside it; a sender that
+// sets it anyway is still asking for an address, and go-pfcp decodes none. An IE
+// that carries no IPv4 address is not by that alone a request for one -- it may be
+// IPv6-only -- and CHV6 asks for an IPv6 address, which is not allocated here.
 func needAllocIP(ueIPaddr *ie.UEIPAddressFields) bool {
-	if has2ndBit(ueIPaddr.Flags) && !has5thBit(ueIPaddr.Flags) {
-		return false
-	}
-
-	return true
+	return has5thBit(ueIPaddr.Flags)
 }
 
 func (af applicationFilter) String() string {
@@ -395,21 +397,39 @@ func (p *pdr) parseUEAddressIE(ueAddrIE *ie.IE, ippool *IPPool) error {
 		return err
 	}
 
-	if needAllocIP(ueIPaddr) {
-		/* alloc IPV6 if CHV6 is enabled : TBD */
+	flags := ueIPaddr.Flags
+
+	switch {
+	case needAllocIP(ueIPaddr):
 		logger.PfcpLog.Infof("UPF should alloc UE IP for SEID %v. CHV4 flag set", p.fseID)
 
 		ueIP4, err = ippool.LookupOrAllocIP(p.fseID)
 		if err != nil {
-			logger.PfcpLog.Errorln("failed to allocate UE IP")
+			logger.PfcpLog.Errorln("failed to allocate UE IP:", err)
 			return err
 		}
 
 		logger.PfcpLog.Debugln("found or allocated new IP", ueIP4, "from pool", ippool)
 
 		p.allocIPFlag = true
-	} else {
+	case has2ndBit(flags):
 		ueIP4 = ueIPaddr.IPv4Address
+	case has1stBit(flags) || has6thBit(flags):
+		// IPv6-only: an IPv6 address (V6) or a request to choose one (CHV6), and no IPv4
+		// part. The rules have no IPv6 UE address to match on yet, so the PDR is refused
+		// rather than installed matching nothing.
+		return ErrUnsupported("IPv6-only UE IP Address IE with flags", fmt.Sprintf("0x%02x", flags))
+	default:
+		return ErrInvalidArgumentWithReason("UE IP Address IE flags", fmt.Sprintf("0x%02x", flags),
+			"neither an address nor CHV4/CHV6 is set")
+	}
+
+	// IPv4v6: the IPv4 part is installed and the IPv6 part is not, as before. The IPv6
+	// part is not reported back in a Created PDR either, so a control plane that asked
+	// the UPF to choose one (CHV6) can see that it was not chosen.
+	if has1stBit(flags) || has6thBit(flags) {
+		logger.PfcpLog.Warnf("ignoring the IPv6 part of the UE IP Address IE for SEID %v "+
+			"(flags 0x%02x): IPv6 UE addresses are not supported", p.fseID, flags)
 	}
 
 	// Needed if SDF filter is bad or absent
