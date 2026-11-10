@@ -40,7 +40,7 @@ func TestNewPFCPConnDialFailure(t *testing.T) {
 		},
 		{
 			name:  "local address without a port",
-			lAddr: "127.0.0.1",
+			lAddr: loopbackV4,
 			rAddr: "127.0.0.1:" + PFCPPort,
 		},
 	}
@@ -100,7 +100,7 @@ func TestNewPFCPConnDialFailure(t *testing.T) {
 // (the peer is dialled as "::1:8805"), or without IPv6 on the host, the resolve step
 // before NewPFCPConn already skips the peer.
 func TestTryConnectToN4PeersSkipsAPeerOfTheOtherFamily(t *testing.T) {
-	node := newTestPFCPNode(t, &upf{peers: []string{"::1"}})
+	node := newTestPFCPNode(t, &upf{peers: []string{loopbackV6}})
 
 	node.tryConnectToN4Peers(node.LocalAddr().String())
 
