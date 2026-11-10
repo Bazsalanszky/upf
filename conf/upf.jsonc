@@ -162,6 +162,7 @@
         "enable_ue_ip_alloc": false,
         // "use_fqdn": "true",
         // "hostname": "upf-0",
+        // "node_id": "upf-0.example.org", // advertised as it is: IPv4, IPv6 or FQDN
         "ue_ip_pool": "10.250.0.0/16"
     }
 }

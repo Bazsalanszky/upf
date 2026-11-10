@@ -47,7 +47,7 @@ type upf struct {
 	n4addr            string
 	accessIP          net.IP
 	coreIP            net.IP
-	nodeID            string
+	nodeID            localNodeID
 	ippool            *IPPool
 	peers             []string
 	dnn               string
@@ -128,28 +128,10 @@ func fqdnHostname() (string, error) {
 }
 
 func NewUPF(conf *Conf, fp datapath) *upf {
-	var (
-		err    error
-		nodeID string
-		hosts  []string
-	)
-
-	nodeID = conf.CPIface.NodeID
-	if conf.CPIface.UseFQDN && nodeID == "" {
-		nodeID, err = fqdnHostname()
-		if err != nil {
-			logger.PfcpLog.Fatalln("unable to get hostname", err)
-		}
-	}
-
-	// TODO: Delete this once CI config is fixed
-	if nodeID != "" {
-		hosts, err = net.DefaultResolver.LookupHost(context.Background(), nodeID)
-		if err != nil {
-			logger.PfcpLog.Fatalln("unable to resolve hostname", nodeID, err)
-		}
-
-		nodeID = hosts[0]
+	nodeID, err := newLocalNodeID(context.Background(), conf.CPIface,
+		net.DefaultResolver.LookupHost, fqdnHostname)
+	if err != nil {
+		logger.PfcpLog.Fatalln(err)
 	}
 
 	u := &upf{

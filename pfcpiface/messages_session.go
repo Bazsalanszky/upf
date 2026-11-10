@@ -64,7 +64,7 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 		return pfdres, errUnmarshal(ErrNodeIDMissing)
 	}
 
-	nodeID, err := sereq.NodeID.NodeID()
+	nodeID, err := peerNodeID(sereq.NodeID)
 	if err != nil {
 		return errUnmarshalReply(err, sereq.NodeID)
 	}
@@ -89,6 +89,8 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 	}
 
 	remoteSEID := fseid.SEID
+	// The CP F-SEID's address only labels rules in logs. An IPv6-only one is 0 here.
+	// TODO(ipv6-p2): keep it as a netip.Addr with the rest of the rule model.
 	fseidIP := ip2int(fseid.IPv4Address)
 
 	errProcessReply := func(err error, cause uint8) (message.Message, error) {
@@ -179,6 +181,7 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 
 			p.tunnelTEID = fteid
 			p.tunnelTEIDMask = 0xFFFFFFFF
+			// TODO(ipv6-p2): the chosen F-TEID is the IPv4 N3 address only (no CHV6).
 			p.tunnelIP4Dst = ip2int(upf.accessIP)
 			p.tunnelIP4DstMask = 0xFFFFFFFF
 		}
@@ -292,14 +295,7 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 		logger.PfcpLog.Errorf("failed to put PFCP session to store: %v", err)
 	}
 
-	var localFSEID *ie.IE
-
-	localIP := pConn.LocalAddr().(*net.UDPAddr).IP
-	if localIP.To4() != nil {
-		localFSEID = ie.NewFSEID(session.localSEID, localIP, nil)
-	} else {
-		localFSEID = ie.NewFSEID(session.localSEID, nil, localIP)
-	}
+	localFSEID := upFSEID(session.localSEID, pConn.LocalAddr().(*net.UDPAddr).IP)
 
 	// Build response message
 	seres := message.NewSessionEstablishmentResponse(0, /* MO?? <-- what's this */
@@ -402,7 +398,7 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 		fseid, err := smreq.CPFSEID.FSEID()
 		if err == nil {
 			session.remoteSEID = fseid.SEID
-			fseidIP = ip2int(fseid.IPv4Address)
+			fseidIP = ip2int(fseid.IPv4Address) // TODO(ipv6-p2): as in the establishment
 
 			logger.PfcpLog.Debugln("updated FSEID from session modification request")
 		}
