@@ -9,6 +9,13 @@ import (
 	"testing"
 )
 
+// The loopback addresses the N4 tests use. The repo's goconst settings count literals
+// across the package's tests, so they are named once.
+const (
+	loopbackV4 = "127.0.0.1"
+	loopbackV6 = "::1"
+)
+
 // TestPFCPAddr covers the N4 listen address (n4_addr) and the peer addresses
 // (cpiface.peers). Joining with a bare ":" gave "2001:db8::1:8805" for an IPv6 host,
 // which Listen and Dial refuse as having too many colons, so an IPv6 n4_addr stopped
@@ -24,7 +31,7 @@ func TestPFCPAddr(t *testing.T) {
 		{host: "0.0.0.0", want: "0.0.0.0:8805", literal: true},
 		{host: "10.0.0.1", want: "10.0.0.1:8805", literal: true},
 		{host: "::", want: "[::]:8805", literal: true, ipv6: true},
-		{host: "::1", want: "[::1]:8805", literal: true, ipv6: true},
+		{host: loopbackV6, want: "[::1]:8805", literal: true, ipv6: true},
 		{host: "2001:db8::1", want: "[2001:db8::1]:8805", literal: true, ipv6: true},
 		{host: "smf.example.org", want: "smf.example.org:8805"},
 	}
@@ -85,8 +92,8 @@ func TestResolveN4Peer(t *testing.T) {
 		want string
 		v6   bool
 	}{
-		{peer: "127.0.0.1", want: "127.0.0.1:8805"},
-		{peer: "::1", want: "[::1]:8805", v6: true},
+		{peer: loopbackV4, want: "127.0.0.1:8805"},
+		{peer: loopbackV6, want: "[::1]:8805", v6: true},
 	}
 
 	for _, tt := range tests {
