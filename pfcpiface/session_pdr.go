@@ -19,6 +19,7 @@ func addPdrInfo(msg *message.SessionEstablishmentResponse, pdrs []pdr) {
 			msg.CreatedPDR = append(msg.CreatedPDR,
 				ie.NewCreatedPDR(
 					ie.NewPDRID(uint16(pdr.pdrID)),
+					// TODO(ipv6-p2): an IPv6 N3 F-TEID (V6) once the rules carry one.
 					ie.NewFTEID(0x01, pdr.tunnelTEID, int2ip(pdr.tunnelIP4Dst), nil, 0),
 				))
 		}

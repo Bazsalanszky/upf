@@ -18,7 +18,9 @@ These are configurations commonly shared between P4-UPF and BESS-UPF.
 | Config | Default value | Mandatory | Comments |
 | ------ | ------------- | --------- | -------- |
 | `log_level` | info | No | |
-| `hostname` | - | No | Used to get local IP address and local NodeID in PFCP messages |
+| `hostname` | - | No | Used to get local IP address and local NodeID in PFCP messages. The name is resolved, and each PFCP association advertises the resolved address of its own N4 address family |
+| `cpiface.node_id` | - | No | NodeID to advertise as it is: an IPv4 or IPv6 address, or an FQDN. Takes precedence over `hostname`. With neither set, each association advertises its local N4 address |
+| `n4_addr` | - (all addresses) | No | Local N4 (PFCP) address: an IPv4 or IPv6 address, written without brackets or port, or a host name. Empty, `::` and `0.0.0.0` all listen on both IPv4 and IPv6 |
 | `http_port` | 8080 | No | |
 | `max_req_retries` | 5 | No | Max retries for sending PFCP message towards SMF/SPGW-C |
 | `resp_timeout` | 2s | No | Period to wait for a response from SMF/SPGW-C |
