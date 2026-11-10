@@ -125,6 +125,8 @@ func (pConn *PFCPConn) associationIEs() []*ie.IE {
 		pConn.nodeID.localIE,
 		// 0x41 = Spare (0) | Assoc Src Inst (1) | Assoc Net Inst (0) | Tied Range (000) | IPV6 (0) | IPV4 (1)
 		//      = 01000001
+		// TODO(ipv6-p2): this is the N3 address, IPv4 only. Advertise the IPv6 one (V6) once
+		// the datapath has an IPv6 N3; it does not depend on the N4 address family.
 		ie.NewUserPlaneIPResourceInformation(flags, 0, upf.accessIP.String(), "", networkInstance, ie.SrcInterfaceAccess),
 		// ie.NewUserPlaneIPResourceInformation(0x41, 0, coreIP, "", "", ie.SrcInterfaceCore),
 		ie.NewUPFunctionFeatures(features...),
@@ -157,7 +159,7 @@ func (pConn *PFCPConn) handleAssociationSetupRequest(msg message.Message) (messa
 		return asres, errProcess(errNodeIDMissing)
 	}
 
-	nodeID, err := asreq.NodeID.NodeID()
+	nodeID, err := peerNodeID(asreq.NodeID)
 	if err != nil {
 		asres.Cause = ie.NewCause(ie.CauseMandatoryIEIncorrect)
 		return asres, errUnmarshal(err)
@@ -236,7 +238,7 @@ func (pConn *PFCPConn) handleAssociationSetupResponse(msg message.Message) error
 		return errUnmarshal(errNodeIDMissing)
 	}
 
-	nodeID, err := asres.NodeID.NodeID()
+	nodeID, err := peerNodeID(asres.NodeID)
 	if err != nil {
 		return errUnmarshal(err)
 	}

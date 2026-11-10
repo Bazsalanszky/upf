@@ -6,6 +6,7 @@ package pfcpiface
 import (
 	"encoding/json"
 	"net"
+	"net/netip"
 	"os"
 	"strings"
 	"time"
@@ -89,6 +90,11 @@ type CPIfaceInfo struct {
 	Dnn             string   `json:"dnn"`
 	EnableUeIPAlloc bool     `json:"enable_ue_ip_alloc"`
 	UEIPPool        string   `json:"ue_ip_pool"`
+
+	// AdvertisedNodeID (node_id) is the Node ID to advertise as it is: an IPv4 or IPv6
+	// literal, or an FQDN. It takes precedence over NodeID (hostname), which is a name
+	// that is resolved, and over UseFQDN.
+	AdvertisedNodeID string `json:"node_id"`
 }
 
 // IfaceType : Gateway interface struct.
@@ -110,6 +116,9 @@ func validateConf(conf Conf) error {
 	}
 
 	if err := validateUEIPPoolAndPeers(conf); err != nil {
+		return err
+	}
+	if err := validateN4Addresses(conf); err != nil {
 		return err
 	}
 	if err := validateTimeouts(conf); err != nil {
@@ -134,6 +143,51 @@ func validateUEIPPoolAndPeers(conf Conf) error {
 		}
 	}
 	return nil
+}
+
+// validateN4Addresses checks n4_addr and cpiface.node_id. Both take an IPv6 literal
+// without brackets or port, as cpiface.peers does; a bracketed one or a host:port used
+// to fail only once the agent tried to listen, as a fatal error.
+func validateN4Addresses(conf Conf) error {
+	if a := conf.N4Addr; a != "" {
+		// An IP literal (with a zone, for a link-local address), or a host name.
+		if _, err := netip.ParseAddr(a); err != nil && strings.ContainsAny(a, ":[]") {
+			return ErrInvalidArgumentWithReason("conf.N4Addr", a,
+				"not an IP address or host name (an IPv6 address is written without brackets or port)")
+		}
+	}
+
+	if id := conf.CPIface.AdvertisedNodeID; id != "" {
+		if a, err := netip.ParseAddr(id); err == nil {
+			if a.Zone() != "" {
+				return ErrInvalidArgumentWithReason("conf.CPIface.AdvertisedNodeID", id,
+					"a Node ID address has no zone")
+			}
+		} else if !isNodeIDFQDN(id) {
+			return ErrInvalidArgumentWithReason("conf.CPIface.AdvertisedNodeID", id,
+				"neither an IP address nor an FQDN (an IPv6 address is written without brackets)")
+		}
+	}
+
+	return nil
+}
+
+// isNodeIDFQDN reports whether s can be sent as an FQDN Node ID: dot-separated labels
+// of 1 to 63 octets, 255 octets at most, nothing that belongs to an address. A trailing
+// dot is allowed; the root label is not encoded.
+func isNodeIDFQDN(s string) bool {
+	s = strings.TrimSuffix(s, ".")
+	if s == "" || len(s) > 253 || strings.ContainsAny(s, ":[]/%@ \t") {
+		return false
+	}
+
+	for _, l := range strings.Split(s, ".") {
+		if l == "" || len(l) > 63 {
+			return false
+		}
+	}
+
+	return true
 }
 
 func validateTimeouts(conf Conf) error {

@@ -115,6 +115,9 @@ func calcBurstSizeFromRate(kbps uint64, ms uint64) uint64 {
 }
 
 // GetUnicastAddressFromInterface returns a unicast IP address configured on the interface.
+//
+// TODO(ipv6-p2): it returns the first address, of whatever family or scope; N3 and N6
+// need one address per family, and never a link-local one.
 func GetUnicastAddressFromInterface(interfaceName string) (net.IP, error) {
 	iface, err := net.InterfaceByName(interfaceName)
 	if err != nil {

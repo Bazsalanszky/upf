@@ -193,30 +193,11 @@ func (node *PFCPNode) NewPFCPConn(lAddr, rAddr string, buf []byte) *PFCPConn {
 	return p
 }
 
-func (pConn *PFCPConn) setLocalNodeID(id string) {
-	nodeIP := net.ParseIP(id)
-
-	// NodeID - FQDN
-	if id != "" && nodeIP == nil {
-		pConn.nodeID.localIE = ie.NewNodeID("", "", id)
-		pConn.nodeID.local = id
-
-		return
-	}
-
-	// NodeID provided is not an IP, use local address
-	if nodeIP == nil {
-		nodeIP = pConn.LocalAddr().(*net.UDPAddr).IP
-	}
-
-	pConn.nodeID.local = nodeIP.String()
-
-	// NodeID - IPv4 vs IPv6
-	if nodeIP.To4() != nil {
-		pConn.nodeID.localIE = ie.NewNodeID(pConn.nodeID.local, "", "")
-	} else {
-		pConn.nodeID.localIE = ie.NewNodeID("", pConn.nodeID.local, "")
-	}
+// setLocalNodeID picks the Node ID this association advertises: the configured one,
+// or the local address of its socket, whose family is the peer's.
+func (pConn *PFCPConn) setLocalNodeID(id localNodeID) {
+	pConn.nodeID.local = id.choose(pConn.LocalAddr().(*net.UDPAddr).IP)
+	pConn.nodeID.localIE = nodeIDIE(pConn.nodeID.local)
 }
 
 // Serve serves forever a single PFCP peer.
