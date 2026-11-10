@@ -45,12 +45,23 @@ func setEndMarkerFeature(features ...uint8) {
 	}
 }
 
+// hasNthBit helpers test one bit of a PFCP flags octet, numbered as TS 29.244 numbers
+// them: bit 1 is the least significant.
+
+func has1stBit(f uint8) bool {
+	return f&0x01 != 0
+}
+
 func has2ndBit(f uint8) bool {
-	return (f&0x02)>>1 == 1
+	return f&0x02 != 0
 }
 
 func has5thBit(f uint8) bool {
-	return (f & 0x010) == 1
+	return f&0x10 != 0
+}
+
+func has6thBit(f uint8) bool {
+	return f&0x20 != 0
 }
 
 func inc(ip net.IP) {
