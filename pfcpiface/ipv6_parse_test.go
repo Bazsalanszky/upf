@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/netip"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/wmnsk/go-pfcp/ie"
@@ -242,7 +243,7 @@ func TestPDRDatapathSupport(t *testing.T) {
 	}{
 		{name: "IPv4 UE", ie: uplink(ie.NewUEIPAddress(ueIPFlagV4, testUEIPv4, "", 0, 0))},
 		{name: "IPv4v6 UE", ie: uplink(ie.NewUEIPAddress(0x43, testUEIPv4, testUEIPv6Full, 0, 64))},
-		{name: "IPv6 UE", ie: uplink(ie.NewUEIPAddress(0x41, "", testUEIPv6Full, 0, 64)), wantErr: true},
+		{name: "IPv6 UE", ie: uplink(ie.NewUEIPAddress(0x41, "", testUEIPv6Full, 0, 64))},
 		{name: "IPv4 F-TEID", ie: uplink(ie.NewFTEID(0x01, 0x100, net.ParseIP("10.10.3.1"), nil, 0))},
 		{
 			name: "IPv4v6 F-TEID",
@@ -336,7 +337,7 @@ func TestParseFAROuterHeaderCreation(t *testing.T) {
 }
 
 // An IPv4v6 session programs exactly what the same session with an IPv4 UE address
-// programs: the IPv6 part is parsed and not installed.
+// programs, and its IPv6 rules besides, in pdrLookup6 only: one per PDR.
 func TestADualStackSessionProgramsTheIPv4Rules(t *testing.T) {
 	program := func(ueIP *ie.IE) []string {
 		pConn, client, _ := goldenConn(t, nil)
@@ -388,8 +389,22 @@ func TestADualStackSessionProgramsTheIPv4Rules(t *testing.T) {
 	v4 := program(ie.NewUEIPAddress(ueIPFlagV4, testUEIPv4, "", 0, 0))
 	dual := program(ie.NewUEIPAddress(ueIPFlagV4|ueIPFlagV6|ueIPFlagIP6L, testUEIPv4, testUEIPv6Full, 0, 64))
 
-	if len(v4) == 0 || !slices.Equal(v4, dual) {
-		t.Errorf("an IPv4v6 session programs\n%v\nand the IPv4 session\n%v", dual, v4)
+	var dual4, dual6 []string
+
+	for _, l := range dual {
+		if strings.HasPrefix(l, PdrLookup6+" ") {
+			dual6 = append(dual6, l)
+		} else {
+			dual4 = append(dual4, l)
+		}
+	}
+
+	if len(v4) == 0 || !slices.Equal(v4, dual4) {
+		t.Errorf("besides pdrLookup6, an IPv4v6 session programs\n%v\nand the IPv4 session\n%v", dual4, v4)
+	}
+
+	if len(dual6) != 2 {
+		t.Errorf("an IPv4v6 session of two PDRs programs %d pdrLookup6 rules, want 2: %v", len(dual6), dual6)
 	}
 }
 
