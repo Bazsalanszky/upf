@@ -165,15 +165,10 @@ class GtpuIpv6Test(BessModuleTestCase):
                 self.assertBessAlive()
 
     # ---------------------------------------------------------------- encap
-    def encap(self, pkts, attrs, add_psc=True, igate=None, **kwargs):
-        """Runs GtpuEncap on input gate 1 (IPv6 peer) when the attributes
-        name an IPv6 peer, gate 0 (IPv4 peer) otherwise, as farLookup and
-        farLookup6 feed it in up4.bess."""
-        if igate is None:
-            igate = 1 if any(a["name"].startswith("tunnel_out_dst_ip6") and a["value_int"] for a in attrs) else 0
+    def encap(self, pkts, attrs, add_psc=True, **kwargs):
         tunnel = SetMetadata(attrs=attrs)
         encap = GtpuEncap(add_psc=add_psc, **kwargs)
-        self.bess.connect_modules(tunnel.name, encap.name, 0, igate)
+        self.bess.connect_modules(tunnel.name, encap.name, 0, 0)
         return self.run_pipeline(tunnel, encap, 0, pkts, [0, 1], proto=bytes)
 
     def test_encap_builds_an_ipv6_outer_header_for_an_ipv6_peer(self):
@@ -214,22 +209,19 @@ class GtpuIpv6Test(BessModuleTestCase):
         self.assertEqual(len(out[1]), 0)
         self.assertEqual(len(out[0]), 1, "the packet did not leave by the failure gate")
 
-    def test_encap_without_any_ipv6_source_fails_the_ipv6_gate(self):
-        out = self.encap([bytes(ETH4) + INNER_UDP], tunnel_attrs(dst4="10.200.0.201")[:6], igate=1)
-        self.assertEqual(len(out[1]), 0)
-        self.assertEqual(len(out[0]), 1, "the packet did not leave by the failure gate")
-
-    def test_encap_to_an_ipv4_peer_is_unchanged_by_the_ipv6_source(self):
-        # The same IPv4 tunnel with and without the module's IPv6 addresses:
-        # byte for byte the same, apart from the IPv4 ID, which counts up.
-        # On gate 0 the IPv6 attributes are not read, whatever they hold.
+    def test_encap_without_an_ipv6_source_is_the_ipv4_encapsulator(self):
+        # An instance without IPv6 sources -- the pipeline's gtpuEncap --
+        # ignores IPv6 tunnel attributes, whatever they hold, and builds the
+        # IPv4 outer header it always has.
         downlink = bytes(ETH4) + INNER_UDP
         plain = self.encap([downlink], tunnel_attrs(dst4="10.200.0.201")[:6])[1][0]
-        dual = self.encap([downlink], tunnel_attrs(dst4="10.200.0.201", dst6=GNB_6), igate=0,
-                          access_ip6=N3_6, core_ip6=CORE_6)[1][0]
+        with_v6_attrs = self.encap([downlink], tunnel_attrs(dst4="10.200.0.201", dst6=GNB_6))[1][0]
         ip_id = slice(ETH_LEN + 4, ETH_LEN + 6)
-        self.assertEqual(plain[: ip_id.start] + plain[ip_id.stop :], dual[: ip_id.start] + dual[ip_id.stop :])
+        self.assertEqual(
+            plain[: ip_id.start] + plain[ip_id.stop :], with_v6_attrs[: ip_id.start] + with_v6_attrs[ip_id.stop :]
+        )
         self.assertEqual(plain[12:14], b"\x08\x00")
+        self.assertEqual(scapy.IP(plain[ETH_LEN:]).dst, "10.200.0.201")
 
     def test_encap_refuses_an_invalid_ipv6_source(self):
         with self.assertRaises(bess.Error):
