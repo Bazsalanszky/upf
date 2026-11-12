@@ -72,7 +72,7 @@ func TestParseFlowDescFamilies(t *testing.T) {
 	}{
 		{flowDesc: flowAnyToAssigned, wantFamily: 0},
 		{flowDesc: "permit out 17 from 192.0.2.0/24 8000 to assigned", wantFamily: 4},
-		{flowDesc: "permit out 58 from ff02::2/128 to assigned", wantFamily: 6},
+		{flowDesc: flowRouterSolicitation, wantFamily: 6},
 		{flowDesc: "permit out ip from 2001:db8::/32 to 2001:db8:1::/48", wantFamily: 6},
 		{flowDesc: "permit out ip from 192.0.2.1 to 2001:db8::1", wantErr: true},
 	} {
@@ -125,11 +125,9 @@ func TestSDFFilterPerFamily(t *testing.T) {
 		{
 			name: "any to assigned, IPv6 UE, downlink", ue: v6only, iface: core,
 			flowDesc: flowAnyToAssigned,
-			// "assigned" has no IPv4 address to stand for, and matches any, as an
-			// "assigned" without a UE address did before. The PDR is refused for its UE.
-			want4:      &applicationFilter{srcPortRange: any4, dstPortRange: any4},
-			want6:      &applicationFilter{dstIP: ueV6Match, srcPortRange: any4, dstPortRange: any4},
-			wantReject: true,
+			// No IPv4 rule: "assigned" has no IPv4 address to stand for, and the rule
+			// would match any UE address (installsIPv4Rule).
+			want6: &applicationFilter{dstIP: ueV6Match, srcPortRange: any4, dstPortRange: any4},
 		},
 		{
 			name: "any to assigned, IPv4v6 UE, downlink", ue: dual, iface: core,
@@ -160,19 +158,27 @@ func TestSDFFilterPerFamily(t *testing.T) {
 				srcPortRange: newExactMatchPortRange(5000), dstPortRange: any4,
 				proto: 17, protoMask: math.MaxUint8,
 			},
-			wantReject: true,
 		},
 		{
 			// The SMF's router solicitation PDR (smf ipv6/router-advertisement).
 			name: "router solicitation, IPv4v6 UE, uplink", ue: dual, iface: access,
-			flowDesc: "permit out 58 from ff02::2/128 to assigned",
+			flowDesc: flowRouterSolicitation,
 			want6: &applicationFilter{
 				srcIP: ueV6Match, dstIP: netip.MustParsePrefix("ff02::2/128"),
 				srcPortRange: any4, dstPortRange: any4, proto: 58, protoMask: math.MaxUint8,
 			},
-			wantReject: true,
 		},
 		{
+			// As the SMF sends it: no UE IP Address, the session's F-TEID scopes it.
+			name: "router solicitation, no UE address, uplink", ue: ue{}, iface: access,
+			flowDesc: flowRouterSolicitation,
+			want6: &applicationFilter{
+				dstIP:        netip.MustParsePrefix("ff02::2/128"),
+				srcPortRange: any4, dstPortRange: any4, proto: 58, protoMask: math.MaxUint8,
+			},
+		},
+		{
+			// It would match every UE's IPv6 address from that prefix: refused.
 			name: "IPv6 filter, IPv4 UE: assigned has no IPv6 address", ue: v4only, iface: core,
 			flowDesc: "permit out ip from 2001:db8::/32 to assigned",
 			want6: func() *applicationFilter {
@@ -189,7 +195,7 @@ func TestSDFFilterPerFamily(t *testing.T) {
 				t.Fatalf("parseSDFFilter() = %v", err)
 			}
 
-			if got := !p.noIPv4Rule; got != (tc.want4 != nil) {
+			if got := p.installsIPv4Rule(); got != (tc.want4 != nil) {
 				t.Errorf("IPv4 rule = %v, want %v", got, tc.want4 != nil)
 			} else if tc.want4 != nil && p.appFilter != *tc.want4 {
 				t.Errorf("IPv4 filter = %v, want %v", p.appFilter, *tc.want4)
@@ -270,25 +276,5 @@ func TestABadSDFFilterRefusesThePDR(t *testing.T) {
 				t.Errorf("the datapath was sent %v", got)
 			}
 		})
-	}
-}
-
-// The SMF installs a router-solicitation PDR in an IPv4v6 session only when it has a
-// GTP-U endpoint of its own (cpGtpu). This datapath cannot match it, and refuses it
-// rather than installing the IPv4 rule its filter used to be truncated into.
-func TestARouterSolicitationPDRIsRefused(t *testing.T) {
-	pConn, client, _ := goldenConn(t, nil)
-
-	assertRequestRejected(t, pConn,
-		goldenPDR(1, 0, 1, []*ie.IE{
-			ie.NewSourceInterface(ie.SrcInterfaceAccess),
-			ie.NewFTEID(0x0d, 0, nil, nil, 1),
-			ie.NewUEIPAddress(0x43, testUEIPv4, testUEIPv6Full, 0, 64),
-			ie.NewSDFFilter("permit out 58 from ff02::2/128 to assigned", "", "", "", 0),
-		}),
-	)
-
-	if got := client.take(); len(got) != 0 {
-		t.Errorf("the datapath was sent %v", got)
 	}
 }

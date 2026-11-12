@@ -36,7 +36,10 @@ type far struct {
 	fseID   uint64
 	fseidIP netip.Addr
 
-	dstIntf       uint8
+	dstIntf uint8
+	// cpFunctionVia is the interface (access or core) a FAR whose dstIntf is
+	// CP-function sends through (upf.cpFunctionIntf); unused otherwise.
+	cpFunctionVia uint8
 	sendEndMarker bool
 	applyAction   uint8
 	tunnelType    uint8
@@ -48,6 +51,16 @@ type far struct {
 	tunnelIPDst netip.Addr
 	tunnelTEID  uint32
 	tunnelPort  uint16
+}
+
+// egressIntf is the interface the FAR forwards through: its Destination Interface, or for
+// CP-function the one configured for it.
+func (f far) egressIntf() uint8 {
+	if f.dstIntf == ie.DstInterfaceCPFunction {
+		return f.cpFunctionVia
+	}
+
+	return f.dstIntf
 }
 
 func (f far) String() string {
@@ -116,6 +129,14 @@ func (f *far) parseFAR(farIE *ie.IE, fseid uint64, upf *upf, op operation) error
 				f.tunnelIPSrc = addrFromIP(upf.accessIP)
 			case ie.DstInterfaceCore:
 				f.tunnelIPSrc = addrFromIP(upf.coreIP)
+			case ie.DstInterfaceCPFunction:
+				// To the SMF's GTP-U endpoint (UP2CP: a UE's router solicitation),
+				// through the configured interface and from its address.
+				f.cpFunctionVia = upf.cpFunctionIntf
+				f.tunnelIPSrc = addrFromIP(upf.accessIP)
+				if f.cpFunctionVia == ie.DstInterfaceCore {
+					f.tunnelIPSrc = addrFromIP(upf.coreIP)
+				}
 			}
 		case ie.PFCPSMReqFlags:
 			fields = Set(fields, FwdIEPfcpSMReqFlags)
@@ -138,7 +159,7 @@ func (f *far) parseFAR(farIE *ie.IE, fseid uint64, upf *upf, op operation) error
 			// The IPv6 source is the interface's; the datapath sends from it whatever
 			// the FAR says (GtpuEncap's access_ip6/core_ip6), and the FAR keeps it for
 			// the end marker it may send.
-			f.tunnelIPSrc = upf.tunnelIP6Src(f.dstIntf)
+			f.tunnelIPSrc = upf.tunnelIP6Src(f.egressIntf())
 		}
 	}
 

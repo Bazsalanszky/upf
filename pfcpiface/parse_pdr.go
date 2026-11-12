@@ -307,8 +307,8 @@ type pdr struct {
 	// ueAddress is the UE's IPv4 address; the zero Addr when the PDR names none.
 	ueAddress netip.Addr
 	// ueIPv6 is the UE's IPv6 prefix, with the address the control plane sent (prefix and
-	// interface identifier); the zero Prefix when the PDR names none. Parsed, not
-	// installed: see checkDatapathSupport.
+	// interface identifier); the zero Prefix when the PDR names none. It is matched as
+	// the prefix (a /64 per PDU session, TS 23.501 clause 5.8.2.2.2), in pdrLookup6.
 	ueIPv6 netip.Prefix
 
 	srcIfaceMask   uint8
@@ -319,10 +319,13 @@ type pdr struct {
 	// packet, and appFilter is not a rule.
 	noIPv4Rule bool
 	// appFilter6 is the match for the PDR's IPv6 packets, when hasIPv6Rule says it has
-	// one: the UE has an IPv6 prefix, or the filter names IPv6 addresses. Parsed, not
-	// installed: see checkDatapathSupport.
+	// one: the UE has an IPv6 prefix, the filter names IPv6 addresses, or the PDR names
+	// no address of either family (it matches both). It is installed in pdrLookup6.
 	appFilter6  applicationFilter
 	hasIPv6Rule bool
+	// assigned6Unresolved says the IPv6 filter names "assigned" and the PDR has no UE
+	// IPv6 prefix for it to stand for, so that it matches any address.
+	assigned6Unresolved bool
 
 	precedence  uint32
 	pdrID       uint32
@@ -354,6 +357,15 @@ func needAllocIP(ueIPaddr *ie.UEIPAddressFields) bool {
 	return has5thBit(ueIPaddr.Flags)
 }
 
+// sameMatch reports whether both filters are the same datapath key (see
+// occupiesSameEntryAs).
+func (af applicationFilter) sameMatch(other applicationFilter) bool {
+	return af.srcIP == other.srcIP && af.dstIP == other.dstIP &&
+		af.proto == other.proto && af.protoMask == other.protoMask &&
+		af.srcPortRange.sameMatch(other.srcPortRange) &&
+		af.dstPortRange.sameMatch(other.dstPortRange)
+}
+
 func (af applicationFilter) String() string {
 	return fmt.Sprintf("ApplicationFilter(srcIP=%v, dstIP=%v, proto=%v/%x, srcPort=%v, dstPort=%v)",
 		af.srcIP, af.dstIP, af.proto, af.protoMask, af.srcPortRange, af.dstPortRange)
@@ -369,8 +381,18 @@ func (af applicationFilter) String() string {
 // here too.
 //
 // The ports are compared through sameMatch rather than by value, because delPDR keys on
-// what CreatePortRangeCartesianProduct makes of a range, not on the range itself.
+// what CreatePortRangeCartesianProduct makes of a range, not on the range itself. The
+// IPv6 rule, in pdrLookup6, is keyed the same way on appFilter6, and which tables the
+// PDR is a rule in is part of the entry.
 func (p pdr) occupiesSameEntryAs(other pdr) bool {
+	if p.installsIPv4Rule() != other.installsIPv4Rule() || p.hasIPv6Rule != other.hasIPv6Rule {
+		return false
+	}
+
+	if p.hasIPv6Rule && !p.appFilter6.sameMatch(other.appFilter6) {
+		return false
+	}
+
 	return p.srcIface == other.srcIface &&
 		p.srcIfaceMask == other.srcIfaceMask &&
 		p.tunnelIPDst == other.tunnelIPDst &&
@@ -393,7 +415,7 @@ func (p pdr) String() string {
 		p.tunnelTEID, p.tunnelTEIDMask, p.ueAddress, p.appFilter, p.precedence,
 		p.fseidIP, p.ctrID, p.farID, p.qerIDList, p.needDecap, p.allocIPFlag)
 
-	// The IPv6 parts, which are not installed, only when there are any.
+	// The IPv6 parts only when there are any, so that an IPv4 rule prints as before.
 	if p.tunnelIPv6Dst.IsValid() {
 		s += fmt.Sprintf(", tunnelIPv6Dst=%v", p.tunnelIPv6Dst)
 	}
@@ -460,7 +482,7 @@ func (p *pdr) parseUEAddressIE(ueAddrIE *ie.IE, ippool *IPPool) error {
 	case has2ndBit(flags):
 		ueIP4 = ueIPaddr.IPv4Address
 	case ueIPv6.IsValid():
-		// IPv6-only. The address is kept; checkDatapathSupport refuses the PDR.
+		// IPv6-only: the PDR matches the prefix in pdrLookup6, and has no IPv4 rule.
 		p.ueIPv6 = ueIPv6
 
 		return nil
@@ -474,12 +496,12 @@ func (p *pdr) parseUEAddressIE(ueAddrIE *ie.IE, ippool *IPPool) error {
 			"neither an address nor CHV4/CHV6 is set")
 	}
 
-	// IPv4v6: both parts are kept, and the datapath installs the IPv4 one, as before. A
-	// CHV6 beside it is not answered: the Created PDR reports no IPv6 prefix, so a
-	// control plane that asked the UPF to choose one can see that it was not chosen.
-	if ueIPv6.IsValid() || has6thBit(flags) {
-		logger.PfcpLog.Warnf("the IPv6 part of the UE IP Address IE for SEID %v (flags 0x%02x, "+
-			"prefix %v) is not installed: the datapath forwards IPv4 only", p.fseID, flags, ueIPv6)
+	// IPv4v6: both parts are kept, and the PDR is a rule in each table. A CHV6 beside an
+	// IPv4 part is not answered: the Created PDR reports no IPv6 prefix, so a control
+	// plane that asked the UPF to choose one can see that it was not chosen.
+	if !ueIPv6.IsValid() && has6thBit(flags) {
+		logger.PfcpLog.Warnf("the UE IP Address IE for SEID %v asks the UP function to choose an IPv6 "+
+			"prefix (CHV6, flags 0x%02x), which it does not: the PDR matches IPv4 only", p.fseID, flags)
 	}
 
 	// Needed if SDF filter is bad or absent
@@ -547,7 +569,11 @@ func (p *pdr) parseSourceInterfaceIE(srcIfaceIE *ie.IE) error {
 
 	switch srcIface {
 	case ie.SrcInterfaceCPFunction:
-		return ErrUnsupported("Source Interface CP Function", srcIface)
+		// CP2UP: the SMF's router advertisements, in a tunnel to the PDR's own F-TEID
+		// (TS 29.244 clause 5.2.1, TS 23.501 clause 5.8.2.2.3). The TEID identifies them,
+		// on any interface.
+		p.srcIface = cpFunction
+		p.srcIfaceMask = 0
 	case ie.SrcInterfaceAccess:
 		p.srcIface = access
 		p.srcIfaceMask = 0xFF
@@ -684,7 +710,8 @@ func (p *pdr) parseSDFFilter(ie *ie.IE) error {
 	}
 
 	switch p.srcIface {
-	case core:
+	case core, cpFunction:
+		// A CP-function PDR carries packets towards the UE, as a core one does.
 		p.applyFlow(ipf, ipf.src, ipf.dst, func(af *applicationFilter) {
 			// TODO: temporary workaround for SDF Filter,
 			//  remove once we meet spec compliance
@@ -746,6 +773,8 @@ func (p *pdr) applyFlow(ipf *ipFilterRule, src, dst endpoint, adjust func(*appli
 	} else {
 		p.appFilter6 = applicationFilter{}
 	}
+
+	p.assigned6Unresolved = p.hasIPv6Rule && !p.ueIPv6.IsValid() && (src.assigned || dst.assigned)
 }
 
 // ueIPv4Match is what the UE's IPv4 address matches as: itself, or any address when the
@@ -797,7 +826,30 @@ func (p *pdr) parsePDI(pdiIEs []*ie.IE, appPFDs map[string]appPFD, ippool *IPPoo
 		}
 	}
 
+	p.matchBothFamiliesWithoutAddresses()
+
 	return nil
+}
+
+// matchBothFamiliesWithoutAddresses gives a PDR that names no address of either family --
+// no UE IP Address, and a filter (if any) on ports and protocol only -- an IPv6 rule as
+// well, the same match without addresses: it matches every packet on its tunnel or
+// interface, of either family. The SMF's CP2UP PDR is one (its F-TEID alone).
+func (p *pdr) matchBothFamiliesWithoutAddresses() {
+	if p.ueAddress.IsValid() || p.ueIPv6.IsValid() || p.noIPv4Rule || p.hasIPv6Rule ||
+		p.appFilter.srcIP.IsValid() || p.appFilter.dstIP.IsValid() {
+		return
+	}
+
+	p.appFilter6 = p.appFilter
+	p.hasIPv6Rule = true
+}
+
+// installsIPv4Rule reports whether the PDR is a rule in the IPv4 table (pdrLookup). Not
+// when its filter names IPv6 addresses only, and not for an IPv6-only UE: without an IPv4
+// address its IPv4 rule would match any UE address.
+func (p pdr) installsIPv4Rule() bool {
+	return !p.noIPv4Rule && (!p.ueIPv6.IsValid() || p.ueAddress.IsValid())
 }
 
 func (p *pdr) processBasicPDI(pdiIEs []*ie.IE, ippool *IPPool) error {
@@ -889,22 +941,35 @@ const (
 )
 
 // checkDatapathSupport refuses a PDR the datapath cannot match as the control plane
-// meant it. The datapath matches IPv4 only, so a PDR that matches only IPv6 traffic
-// would be installed matching something else, or everything: it is refused here, where
-// the refusal reaches the control plane as Request rejected, rather than as a datapath
-// write that fails. The IPv6 part of a PDR that also matches IPv4 -- an IPv4v6 UE, an
-// F-TEID with both addresses -- is kept in the rule and not installed.
+// meant it, here, where the refusal reaches the control plane as Request rejected,
+// rather than as a datapath write that fails. A PDR's IPv4 packets are matched in
+// pdrLookup and its IPv6 ones in pdrLookup6 (installsIPv4Rule, hasIPv6Rule), so each
+// filter has to be of its table's family.
 func (p pdr) checkDatapathSupport() error {
-	if p.ueIPv6.IsValid() && !p.ueAddress.IsValid() {
-		return ErrUnsupported("PDR for an IPv6-only UE address", p.ueIPv6)
+	if !p.installsIPv4Rule() && !p.hasIPv6Rule {
+		return ErrUnsupported("PDR that matches no packet of either family", p.pdrID)
 	}
 
-	if p.noIPv4Rule {
-		return ErrUnsupported("PDR whose filter matches IPv6 only", p.appFilter6)
+	// "assigned" of a UE with an IPv4 address and no IPv6 prefix would match every UE's
+	// IPv6 address. A PDR with no UE address at all is scoped by its tunnel (the SMF's
+	// router solicitation PDR, on the session's F-TEID), and "assigned" is any there, as
+	// for IPv4.
+	if p.assigned6Unresolved && p.ueAddress.IsValid() {
+		return ErrUnsupported("IPv6 filter on \"assigned\" for a UE with no IPv6 prefix", p.appFilter6)
+	}
+
+	for _, a := range []netip.Prefix{p.appFilter6.srcIP, p.appFilter6.dstIP} {
+		if p.hasIPv6Rule && a.IsValid() && !a.Addr().Is6() {
+			return ErrUnsupported("PDR matching an IPv4 address in its IPv6 rule", a)
+		}
 	}
 
 	if p.tunnelIPv6Dst.IsValid() && !p.tunnelIPv6Dst.Addr().Is6() {
 		return ErrUnsupported("PDR on an F-TEID whose IPv6 address is not one", p.tunnelIPv6Dst)
+	}
+
+	if !p.installsIPv4Rule() {
+		return nil
 	}
 
 	for _, a := range []netip.Prefix{p.tunnelIPDst, p.appFilter.srcIP, p.appFilter.dstIP} {

@@ -176,14 +176,43 @@ func createdUEAddress(t *testing.T, seres *message.SessionEstablishmentResponse)
 	return nil
 }
 
-// TestAnIPv6OnlyUEAddressIsRejectedWithoutAPool is the default deployment:
+// acceptUEAddress sends the one-PDR establishment of rejectUEAddress and asserts that it
+// was accepted.
+func acceptUEAddress(t *testing.T, pConn *PFCPConn, ueIP *ie.IE) {
+	t.Helper()
+
+	sereq := message.NewSessionEstablishmentRequest(0, 0, 0, 1, 0,
+		ie.NewNodeID("", "", testRemoteNodeID),
+		ie.NewFSEID(0xC0FFEE, net.ParseIP("127.0.0.1"), nil),
+		ueAddressPDR(ueIP),
+		downlinkFAR(),
+	)
+
+	rsp, err := pConn.handleSessionEstablishmentRequest(sereq)
+	if err != nil {
+		t.Fatalf("the establishment was refused: %v", err)
+	}
+
+	seres, ok := rsp.(*message.SessionEstablishmentResponse)
+	if !ok {
+		t.Fatalf("expected a Session Establishment Response, got %T", rsp)
+	}
+
+	assertAccepted(t, seres.Cause, "establishment")
+
+	if got := createdUEAddress(t, seres); got != nil {
+		t.Errorf("the response reports a UE IPv4 address %v the control plane never asked for", got)
+	}
+}
+
+// TestAnIPv6OnlyUEAddressIsAcceptedWithoutAPool is the default deployment:
 // enable_ue_ip_alloc is off, so there is no pool. An IPv6-only UE IP Address IE used to
 // be taken as a request to allocate an IPv4 address from that absent pool, and the
-// agent dereferenced the nil pool and exited.
-func TestAnIPv6OnlyUEAddressIsRejectedWithoutAPool(t *testing.T) {
+// agent dereferenced the nil pool and exited. It is an IPv6 PDU session (pdrLookup6).
+func TestAnIPv6OnlyUEAddressIsAcceptedWithoutAPool(t *testing.T) {
 	pConn := establishingConn(t, nil)
 
-	rejectUEAddress(t, pConn, ie.NewUEIPAddress(ueIPFlagV6, "", testUEIPv6, 0, 0))
+	acceptUEAddress(t, pConn, ie.NewUEIPAddress(ueIPFlagV6, "", testUEIPv6, 0, 0))
 }
 
 // TestAnIPv6OnlyUEAddressAllocatesNothing is the same IE where a pool exists. The
@@ -196,7 +225,7 @@ func TestAnIPv6OnlyUEAddressAllocatesNothing(t *testing.T) {
 
 	pConn := establishingConn(t, pool)
 
-	rejectUEAddress(t, pConn, ie.NewUEIPAddress(ueIPFlagV6, "", testUEIPv6, 0, 0))
+	acceptUEAddress(t, pConn, ie.NewUEIPAddress(ueIPFlagV6, "", testUEIPv6, 0, 0))
 
 	assertPoolIsWhole(t, pool, "an establishment with an IPv6-only UE address")
 }

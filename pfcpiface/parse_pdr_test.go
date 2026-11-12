@@ -59,6 +59,9 @@ func Test_parsePDR(t *testing.T) {
 				farID:          farID,
 				qerIDList:      []uint32{qerID},
 				needDecap:      0x1, // OuterHeaderRemoval IE is present for uplink PDRs
+				// No UE address and no filter: it matches every packet in its tunnel, of
+				// either family (matchBothFamiliesWithoutAddresses).
+				hasIPv6Rule: true,
 			},
 			description: "Valid Uplink Create PDR input",
 		},

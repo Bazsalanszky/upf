@@ -95,7 +95,20 @@ type CPIfaceInfo struct {
 	// literal, or an FQDN. It takes precedence over NodeID (hostname), which is a name
 	// that is resolved, and over UseFQDN.
 	AdvertisedNodeID string `json:"node_id"`
+
+	// CPFunctionInterface (cp_function_interface) is the interface a FAR whose
+	// Destination Interface is CP-function sends through: "access" (the default) or
+	// "core". Such a FAR tunnels a UE's packets to the SMF's GTP-U endpoint -- the
+	// router solicitations of an IPv6 PDU session (TS 23.501 clause 5.8.2.2.3,
+	// TS 29.244 clause 5.2.1) -- and the endpoint has to be reachable from it.
+	CPFunctionInterface string `json:"cp_function_interface"`
 }
+
+// Values of CPIfaceInfo.CPFunctionInterface.
+const (
+	cpFunctionViaAccess = "access"
+	cpFunctionViaCore   = "core"
+)
 
 // IfaceType : Gateway interface struct.
 //
@@ -166,6 +179,12 @@ func validateConf(conf Conf) error {
 	}
 	if err := validateIface("core", conf.CoreIface); err != nil {
 		return err
+	}
+	switch conf.CPIface.CPFunctionInterface {
+	case "", cpFunctionViaAccess, cpFunctionViaCore:
+	default:
+		return ErrInvalidArgumentWithReason("conf.cpiface.cp_function_interface",
+			conf.CPIface.CPFunctionInterface, `not "access", "core" or empty`)
 	}
 	if err := validateTimeouts(conf); err != nil {
 		return err

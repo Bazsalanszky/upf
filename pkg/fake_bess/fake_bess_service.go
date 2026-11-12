@@ -20,6 +20,7 @@ import (
 
 const (
 	pdrLookupModuleName          = "pdrLookup"
+	pdrLookup6ModuleName         = "pdrLookup6" // the PDRs of IPv6 packets
 	farLookupModuleName          = "farLookup"
 	sessionQerModuleName         = "sessionQERLookup"
 	appQerModuleName             = "appQERLookup"
@@ -200,7 +201,7 @@ func (b *fakeBessService) GetModuleState(name string) []proto.Message {
 func (b *fakeBessService) unsafeGetOrAddModule(name string) module {
 	if _, ok := b.modules[name]; !ok {
 		switch name {
-		case pdrLookupModuleName:
+		case pdrLookupModuleName, pdrLookup6ModuleName:
 			b.modules[name] = &wildcardModule{
 				baseModule{name: name},
 				nil,
