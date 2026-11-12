@@ -158,11 +158,44 @@ func (b *bess) sendPathMonitoring(ctx context.Context, method upfMsgType, gnb ui
 }
 
 func (b *bess) IsConnected(accessIP *net.IP) bool {
-	if (b.conn == nil) || (b.conn.GetState() != connectivity.Ready) {
+	if b.conn == nil {
 		return false
 	}
 
-	return true
+	switch b.conn.GetState() {
+	case connectivity.Ready:
+		return true
+	case connectivity.Idle:
+		// A channel that has not connected yet, or one grpc-go put in idle mode: it connects
+		// on the next RPC, so this is not the datapath being down. Connect, and wait briefly.
+		b.conn.Connect()
+
+		ctx, cancel := context.WithTimeout(context.Background(), idleConnectTimeout)
+		defer cancel()
+
+		for state := b.conn.GetState(); state != connectivity.Ready; state = b.conn.GetState() {
+			if !b.conn.WaitForStateChange(ctx, state) {
+				return false
+			}
+		}
+
+		return true
+	default:
+		return false
+	}
+}
+
+// idleConnectTimeout bounds how long IsConnected waits for an idle channel to bessd to connect.
+const idleConnectTimeout = 2 * time.Second
+
+// bessDialOptions are the options of the channel to bessd. Idle mode is off: grpc-go puts a channel
+// that has made no RPC for 30 minutes into IDLE, and between sessions the agent makes none, so a UPF
+// left alone for half an hour refused every association with "datapath down" (IsConnected).
+func bessDialOptions() []grpc.DialOption {
+	return []grpc.DialOption{
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithIdleTimeout(0),
+	}
 }
 
 func (b *bess) SendEndMarkers(endMarkerList *[][]byte) error {
@@ -1032,7 +1065,7 @@ func (b *bess) SetUpfInfo(u *upf, conf *Conf) {
 
 	b.endMarkerChan = make(chan []byte, 1024)
 
-	b.conn, err = grpc.NewClient(*bessIP, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	b.conn, err = grpc.NewClient(*bessIP, bessDialOptions()...)
 	if err != nil {
 		logger.BessLog.Fatalln("did not connect:", err)
 	}
