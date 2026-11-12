@@ -300,9 +300,16 @@ type pdr struct {
 	// tunnelIPDst is the F-TEID address the PDR matches GTP-U packets on, as a host
 	// prefix; the zero Prefix matches any.
 	tunnelIPDst netip.Prefix
-	tunnelTEID  uint32
+	// tunnelIPv6Dst is the IPv6 address of the F-TEID, when it has one. It is parsed but
+	// not matched on: the datapath forwards IPv4 only.
+	tunnelIPv6Dst netip.Prefix
+	tunnelTEID    uint32
 	// ueAddress is the UE's IPv4 address; the zero Addr when the PDR names none.
 	ueAddress netip.Addr
+	// ueIPv6 is the UE's IPv6 prefix, with the address the control plane sent (prefix and
+	// interface identifier); the zero Prefix when the PDR names none. Parsed, not
+	// installed: see checkDatapathSupport.
+	ueIPv6 netip.Prefix
 
 	srcIfaceMask   uint8
 	tunnelTEIDMask uint32
@@ -398,6 +405,13 @@ func (p *pdr) parseUEAddressIE(ueAddrIE *ie.IE, ippool *IPPool) error {
 
 	flags := ueIPaddr.Flags
 
+	// The IPv6 part is read first: it allocates nothing, so a malformed one is refused
+	// before an IPv4 address is taken out of the pool.
+	ueIPv6, err := parseUEIPv6(ueIPaddr)
+	if err != nil {
+		return err
+	}
+
 	switch {
 	case needAllocIP(ueIPaddr):
 		logger.PfcpLog.Infof("UPF should alloc UE IP for SEID %v. CHV4 flag set", p.fseID)
@@ -413,22 +427,27 @@ func (p *pdr) parseUEAddressIE(ueAddrIE *ie.IE, ippool *IPPool) error {
 		p.allocIPFlag = true
 	case has2ndBit(flags):
 		ueIP4 = ueIPaddr.IPv4Address
-	case has1stBit(flags) || has6thBit(flags):
-		// IPv6-only: an IPv6 address (V6) or a request to choose one (CHV6), and no IPv4
-		// part. The rules have no IPv6 UE address to match on yet, so the PDR is refused
-		// rather than installed matching nothing.
-		return ErrUnsupported("IPv6-only UE IP Address IE with flags", fmt.Sprintf("0x%02x", flags))
+	case ueIPv6.IsValid():
+		// IPv6-only. The address is kept; checkDatapathSupport refuses the PDR.
+		p.ueIPv6 = ueIPv6
+
+		return nil
+	case has6thBit(flags):
+		// CHV6 alone: the UPF is to choose the UE's IPv6 prefix, which it cannot do, and
+		// there is no IPv4 part.
+		return ErrUnsupported("UE IP Address IE asking the UP function to choose an IPv6 prefix (CHV6), flags",
+			fmt.Sprintf("0x%02x", flags))
 	default:
 		return ErrInvalidArgumentWithReason("UE IP Address IE flags", fmt.Sprintf("0x%02x", flags),
 			"neither an address nor CHV4/CHV6 is set")
 	}
 
-	// IPv4v6: the IPv4 part is installed and the IPv6 part is not, as before. The IPv6
-	// part is not reported back in a Created PDR either, so a control plane that asked
-	// the UPF to choose one (CHV6) can see that it was not chosen.
-	if has1stBit(flags) || has6thBit(flags) {
-		logger.PfcpLog.Warnf("ignoring the IPv6 part of the UE IP Address IE for SEID %v "+
-			"(flags 0x%02x): IPv6 UE addresses are not supported", p.fseID, flags)
+	// IPv4v6: both parts are kept, and the datapath installs the IPv4 one, as before. A
+	// CHV6 beside it is not answered: the Created PDR reports no IPv6 prefix, so a
+	// control plane that asked the UPF to choose one can see that it was not chosen.
+	if ueIPv6.IsValid() || has6thBit(flags) {
+		logger.PfcpLog.Warnf("the IPv6 part of the UE IP Address IE for SEID %v (flags 0x%02x, "+
+			"prefix %v) is not installed: the datapath forwards IPv4 only", p.fseID, flags, ueIPv6)
 	}
 
 	// Needed if SDF filter is bad or absent
@@ -438,8 +457,54 @@ func (p *pdr) parseUEAddressIE(ueAddrIE *ie.IE, ippool *IPPool) error {
 	}
 
 	p.ueAddress = addrFromIP(ueIP4)
+	p.ueIPv6 = ueIPv6
 
 	return nil
+}
+
+// defaultUEIPv6PrefixLength is the length of a UE IPv6 prefix whose UE IP Address IE does
+// not give one (TS 29.244 clause 8.2.62, and TS 23.501 clause 5.8.2.2.2: a /64 per PDU
+// session).
+const defaultUEIPv6PrefixLength = 64
+
+// parseUEIPv6 returns the IPv6 part of a UE IP Address IE: the address as the control
+// plane sent it -- an SMF sends the UE's full address, prefix and interface identifier --
+// with the prefix length from the IPv6 Prefix Length field (IP6PL), or /64 without one.
+// The prefix is not masked, so the interface identifier survives; a match uses the
+// masked prefix. An IE without an IPv6 address gives the zero Prefix.
+func parseUEIPv6(f *ie.UEIPAddressFields) (netip.Prefix, error) {
+	if !has1stBit(f.Flags) {
+		return netip.Prefix{}, nil
+	}
+
+	a := addrFromIP(f.IPv6Address)
+	if isZeroAddr(a) {
+		// V6 with no address, as some senders set it beside CHV6.
+		return netip.Prefix{}, nil
+	}
+
+	if !a.Is6() {
+		return netip.Prefix{}, ErrInvalidArgumentWithReason("UE IP Address IE IPv6 address", a,
+			"an IPv4-mapped address")
+	}
+
+	if has4thBit(f.Flags) {
+		// IPv6D: prefix delegation, which neither the SMF nor this UPF does.
+		return netip.Prefix{}, ErrUnsupported("UE IP Address IE with IPv6 prefix delegation (IPv6D), bits",
+			f.IPv6PrefixDelegationBits)
+	}
+
+	bits := defaultUEIPv6PrefixLength
+
+	if has7thBit(f.Flags) {
+		bits = int(f.IPv6PrefixLength)
+		if bits == 0 || bits > 128 {
+			return netip.Prefix{}, ErrInvalidArgumentWithReason("UE IP Address IE IPv6 prefix length", bits,
+				"not between 1 and 128")
+		}
+	}
+
+	return netip.PrefixFrom(a, bits), nil
 }
 
 // ueAddrString is the UE address as parseFlowDesc takes it: empty for none.
@@ -479,6 +544,13 @@ func (p *pdr) parseFTEID(teidIE *ie.IE) error {
 
 	teid := fteid.TEID
 	if fteid.HasCh() {
+		// CHOOSE with only the V6 flag asks for an IPv6 F-TEID (TS 29.244 clause 8.2.3).
+		// The UPF has none to give; it used to answer with its IPv4 one.
+		if fteid.HasIPv6() && !fteid.HasIPv4() {
+			return ErrUnsupported("F-TEID asking the UP function to choose an IPv6 address, flags",
+				fmt.Sprintf("0x%02x", fteid.Flags))
+		}
+
 		p.UPAllocateFteid = true
 		if fteid.HasChID() {
 			p.chooseID = fteid.ChooseID
@@ -488,6 +560,10 @@ func (p *pdr) parseFTEID(teidIE *ie.IE) error {
 		p.tunnelTEID = teid
 		p.tunnelTEIDMask = 0xFFFFFFFF
 		p.tunnelIPDst = hostPrefix(addrFromIP(fteid.IPv4Address))
+
+		if fteid.HasIPv6() {
+			p.tunnelIPv6Dst = hostPrefix(addrFromIP(fteid.IPv6Address))
+		}
 	}
 
 	return nil
@@ -711,6 +787,39 @@ func (p *pdr) parsePDR(ie1 *ie.IE, seid uint64, appPFDs map[string]appPFD, ippoo
 	/*p.qerID = qerID*/
 	p.needDecap = outerHeaderRemoval
 
+	return p.checkDatapathSupport()
+}
+
+// Outer Header Removal Descriptions (TS 29.244 clause 8.2.64). GTP-U/UDP/IP (6), either
+// family, leaves needDecap clear, as it always has.
+const (
+	ohrGtpUUdpIPv4 = 0
+	ohrGtpUUdpIPv6 = 1
+	ohrUDPIPv6     = 3
+	ohrIPv6        = 5
+)
+
+// checkDatapathSupport refuses a PDR the datapath cannot match as the control plane
+// meant it. The datapath matches IPv4 only, so a PDR that matches only IPv6 traffic
+// would be installed matching something else, or everything: it is refused here, where
+// the refusal reaches the control plane as Request rejected, rather than as a datapath
+// write that fails. The IPv6 part of a PDR that also matches IPv4 -- an IPv4v6 UE, an
+// F-TEID with both addresses -- is kept in the rule and not installed.
+func (p pdr) checkDatapathSupport() error {
+	if p.ueIPv6.IsValid() && !p.ueAddress.IsValid() {
+		return ErrUnsupported("PDR for an IPv6-only UE address", p.ueIPv6)
+	}
+
+	if p.tunnelIPv6Dst.IsValid() && !p.tunnelIPDst.IsValid() {
+		return ErrUnsupported("PDR on an IPv6-only F-TEID", p.tunnelIPv6Dst)
+	}
+
+	for _, a := range []netip.Prefix{p.tunnelIPDst, p.appFilter.srcIP, p.appFilter.dstIP} {
+		if a.IsValid() && !a.Addr().Is4() {
+			return ErrUnsupported("PDR matching an IPv6 address", a)
+		}
+	}
+
 	return nil
 }
 
@@ -739,8 +848,15 @@ func (p *pdr) parseCorePDRFields(
 	}
 
 	res, err := ie1.OuterHeaderRemovalDescription()
-	if res == 0 && err == nil { // 0 == GTP-U/UDP/IPv4
-		outerHeaderRemoval = 1
+	if err == nil {
+		switch res {
+		case ohrGtpUUdpIPv4:
+			outerHeaderRemoval = 1
+		case ohrGtpUUdpIPv6, ohrUDPIPv6, ohrIPv6:
+			// The datapath parses IPv4 outer headers only: a PDR on IPv6 ones would
+			// never match, or would be matched on the wrong header.
+			return 0, 0, 0, 0, ErrUnsupported("Outer Header Removal of an IPv6 header, description", res)
+		}
 	}
 
 	err = p.parsePDI(pdi, appPFDs, ippool)

@@ -55,12 +55,20 @@ func has2ndBit(f uint8) bool {
 	return f&0x02 != 0
 }
 
+func has4thBit(f uint8) bool {
+	return f&0x08 != 0
+}
+
 func has5thBit(f uint8) bool {
 	return f&0x10 != 0
 }
 
 func has6thBit(f uint8) bool {
 	return f&0x20 != 0
+}
+
+func has7thBit(f uint8) bool {
+	return f&0x40 != 0
 }
 
 func inc(ip net.IP) {
