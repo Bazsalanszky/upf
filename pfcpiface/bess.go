@@ -805,12 +805,24 @@ func resolveUEIP(
 			return ueIpString, false
 		}
 
-		// Try to find the N6 uplink PDR with the UE IP.
+		// Try to find the N6 uplink PDR with the UE IP: its IPv4 address, or for an
+		// IPv6-only UE the IPv6 address the SMF sent (the /64 is the session's).
+		found := false
+
 		for _, p := range session.pdrs {
 			if p.IsUplink() && !isZeroAddr(p.ueAddress) {
 				ueIpString = p.ueAddress.String()
 				logger.BessLog.Debugln(p.fseID, " -> ", ueIpString)
+				found = true
+
 				break
+			}
+		}
+
+		for _, p := range session.pdrs {
+			if !found && p.IsUplink() && p.ueIPv6.IsValid() {
+				ueIpString = p.ueIPv6.Addr().String()
+				found = true
 			}
 		}
 	}
@@ -995,6 +1007,12 @@ func (b *bess) clearState() {
 
 	if err = b.processPDR(ctx, anyWildcardClear, upfMsgTypeClear); err != nil {
 		logger.BessLog.Errorln("failed to clear pdrLookup:", err)
+	}
+
+	// A pipeline without pdrLookup6 (before IPv6 UE sessions) refuses the PDRs of
+	// IPv6 sessions; it says so here once.
+	if err = b.processPDRTable(ctx, PdrLookup6, anyWildcardClear, upfMsgTypeClear); err != nil {
+		logger.BessLog.Warnln("failed to clear pdrLookup6, IPv6 UE sessions will be refused:", err)
 	}
 
 	clearExactCmd := &pb.ExactMatchCommandClearArg{}
@@ -1232,6 +1250,11 @@ func commandOutcome(module string, method upfMsgType, methodName string,
 // addPDR and delPDR told GRPCJoin the rule was programmed whatever the module answered,
 // and the cause SendMsgToUPF derives from that join could not be anything but accepted.
 func (b *bess) processPDR(ctx context.Context, arg *anypb.Any, method upfMsgType) error {
+	return b.processPDRTable(ctx, "pdrLookup", arg, method)
+}
+
+// processPDRTable programs a PDR table: pdrLookup, or pdrLookup6 for IPv6 packets.
+func (b *bess) processPDRTable(ctx context.Context, module string, arg *anypb.Any, method upfMsgType) error {
 	if method != upfMsgTypeAdd && method != upfMsgTypeDel && method != upfMsgTypeClear {
 		return ErrInvalidArgument("method name", method)
 	}
@@ -1239,14 +1262,14 @@ func (b *bess) processPDR(ctx context.Context, arg *anypb.Any, method upfMsgType
 	methods := [...]string{upfMethodAdd, upfMethodAdd, upfMethodDelete, upfMethodClear}
 
 	resp, err := b.client.ModuleCommand(ctx, &pb.CommandRequest{
-		Name: "pdrLookup",
+		Name: module,
 		Cmd:  methods[method],
 		Arg:  arg,
 	})
 
-	logger.BessLog.Debugf("pdrlookup resp: %v", resp)
+	logger.BessLog.Debugf("%s resp: %v", module, resp)
 
-	return commandOutcome("pdrLookup", method, methods[method], resp, err)
+	return commandOutcome(module, method, methods[method], resp, err)
 }
 
 // pdrIPv4Match is a PDR's address match in the 32-bit fields of the datapath's PDR
@@ -1333,6 +1356,13 @@ func (b *bess) addPDR(ctx context.Context, done chan<- bool, p pdr) {
 			break
 		}
 
+		// The IPv4 rule(s), unless the PDR matches IPv6 only (installsIPv4Rule); then
+		// the IPv6 ones (pdrLookup6), when it has any.
+		if !p.installsIPv4Rule() {
+			completed = b.writePDR6(ctx, p, upfMsgTypeAdd)
+			return
+		}
+
 		m, err := p.ipv4Match()
 		if err != nil {
 			logger.BessLog.Errorln(err)
@@ -1348,13 +1378,15 @@ func (b *bess) addPDR(ctx context.Context, done chan<- bool, p pdr) {
 
 		logger.BessLog.Debugf("PDR rules %+v", portRules)
 
+		srcIface, srcIfaceMask := p.srcIfaceField()
+
 		for _, t := range p.tunnelMatches(m) {
 			for _, r := range portRules {
 				f := &pb.WildcardMatchCommandAddArg{
 					Gate:     uint64(p.needDecap),
 					Priority: int64(math.MaxUint32 - p.precedence),
 					Values: []*pb.FieldData{
-						intEnc(uint64(p.srcIface)),        /* src_iface */
+						intEnc(srcIface),                  /* src_iface */
 						intEnc(uint64(t.dst)),             /* tunnel_ipv4_dst */
 						intEnc(uint64(p.tunnelTEID)),      /* enb_teid */
 						intEnc(uint64(m.srcIP)),           /* ueaddr ip*/
@@ -1364,7 +1396,7 @@ func (b *bess) addPDR(ctx context.Context, done chan<- bool, p pdr) {
 						intEnc(uint64(p.appFilter.proto)), /* proto id */
 					},
 					Masks: []*pb.FieldData{
-						intEnc(uint64(p.srcIfaceMask)),        /* src_iface-mask */
+						intEnc(srcIfaceMask),                  /* src_iface-mask */
 						intEnc(uint64(t.mask)),                /* tunnel_ipv4_dst-mask */
 						intEnc(uint64(p.tunnelTEIDMask)),      /* enb_teid-mask */
 						intEnc(uint64(m.srcIPMask)),           /* ueaddr ip-mask */
@@ -1393,7 +1425,7 @@ func (b *bess) addPDR(ctx context.Context, done chan<- bool, p pdr) {
 				}
 			}
 		}
-		completed = true
+		completed = b.writePDR6(ctx, p, upfMsgTypeAdd)
 	}()
 }
 
@@ -1406,6 +1438,11 @@ func (b *bess) delPDR(ctx context.Context, done chan<- bool, p pdr) {
 			arg *anypb.Any
 			err error
 		)
+
+		if !p.installsIPv4Rule() {
+			completed = b.writePDR6(ctx, p, upfMsgTypeDel)
+			return
+		}
 
 		m, err := p.ipv4Match()
 		if err != nil {
@@ -1420,11 +1457,13 @@ func (b *bess) delPDR(ctx context.Context, done chan<- bool, p pdr) {
 			return
 		}
 
+		srcIface, srcIfaceMask := p.srcIfaceField()
+
 		for _, t := range p.tunnelMatches(m) {
 			for _, r := range portRules {
 				f := &pb.WildcardMatchCommandDeleteArg{
 					Values: []*pb.FieldData{
-						intEnc(uint64(p.srcIface)),        /* src_iface */
+						intEnc(srcIface),                  /* src_iface */
 						intEnc(uint64(t.dst)),             /* tunnel_ipv4_dst */
 						intEnc(uint64(p.tunnelTEID)),      /* enb_teid */
 						intEnc(uint64(m.srcIP)),           /* ueaddr ip*/
@@ -1434,7 +1473,7 @@ func (b *bess) delPDR(ctx context.Context, done chan<- bool, p pdr) {
 						intEnc(uint64(p.appFilter.proto)), /* proto id */
 					},
 					Masks: []*pb.FieldData{
-						intEnc(uint64(p.srcIfaceMask)),        /* src_iface-mask */
+						intEnc(srcIfaceMask),                  /* src_iface-mask */
 						intEnc(uint64(t.mask)),                /* tunnel_ipv4_dst-mask */
 						intEnc(uint64(p.tunnelTEIDMask)),      /* enb_teid-mask */
 						intEnc(uint64(m.srcIPMask)),           /* ueaddr ip-mask */
@@ -1456,7 +1495,7 @@ func (b *bess) delPDR(ctx context.Context, done chan<- bool, p pdr) {
 				}
 			}
 		}
-		completed = true
+		completed = b.writePDR6(ctx, p, upfMsgTypeDel)
 	}()
 }
 
@@ -1790,7 +1829,7 @@ func (b *bess) processGtpuPathMonitoring(ctx context.Context, arg *anypb.Any, me
 
 func (b *bess) setActionValue(f far) uint8 {
 	if (f.applyAction & ActionForward) != 0 {
-		switch f.dstIntf {
+		switch f.egressIntf() {
 		case ie.DstInterfaceAccess:
 			return farForwardD
 		case ie.DstInterfaceCore, ie.DstInterfaceSGiLANN6LAN:
@@ -1887,7 +1926,8 @@ func (b *bess) addFAR(ctx context.Context, done chan<- bool, far far) {
 			}
 		}
 
-		if enableGtpuPathMonitoring {
+		// The SMF's GTP-U endpoint (a FAR to the CP-function) is not a gNB to monitor.
+		if enableGtpuPathMonitoring && far.dstIntf != ie.DstInterfaceCPFunction {
 			// A modification reaches here too, with the FAR's new version, so the
 			// registration moves with the FAR rather than being added again.
 			// Path monitoring is not a forwarding rule: a session is programmed

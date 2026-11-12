@@ -55,7 +55,10 @@ type upf struct {
 	coreIP6   netip.Addr
 	// n3Family restricts the F-TEIDs the UPF offers on N3 to one family; see
 	// IfaceType.TransportFamily.
-	n3Family         string
+	n3Family string
+	// cpFunctionIntf is the Destination Interface (access or core) a FAR to the
+	// CP-function sends through; see CPIfaceInfo.CPFunctionInterface.
+	cpFunctionIntf   uint8
 	nodeID           localNodeID
 	ippool           *IPPool
 	peers            []string
@@ -81,6 +84,11 @@ const (
 	// src-iface consts.
 	core   = 0x2
 	access = 0x1
+	// cpFunction is a PDR whose Source Interface is CP-function: packets the SMF sends
+	// (CP2UP, its router advertisements). They arrive in a tunnel to an F-TEID of their
+	// own on whichever interface reaches the SMF, so the rule matches any (mask 0), and
+	// the datapath never sees this value.
+	cpFunction = 0x3
 
 	// far-id specific directions.
 	n3 = 0x0
@@ -202,6 +210,11 @@ func setupPeersAndInterfaces(u *upf, conf *Conf) bool {
 	u.accessIP = ipFromAddr(accessIP4)
 	u.coreIP = ipFromAddr(coreIP4)
 	u.n3Family = conf.AccessIface.TransportFamily
+
+	u.cpFunctionIntf = ie.DstInterfaceAccess
+	if conf.CPIface.CPFunctionInterface == cpFunctionViaCore {
+		u.cpFunctionIntf = ie.DstInterfaceCore
+	}
 	logger.PfcpLog.Infof("GTP-U addresses: access %v %v (N3 transport family %q), core %v %v",
 		accessIP4, u.accessIP6, u.n3Family, coreIP4, u.coreIP6)
 

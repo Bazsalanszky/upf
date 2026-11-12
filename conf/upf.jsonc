@@ -163,6 +163,9 @@
         // "use_fqdn": "true",
         // "hostname": "upf-0",
         // "node_id": "upf-0.example.org", // advertised as it is: IPv4, IPv6 or FQDN
+        // The interface a FAR to the CP-function (the SMF's GTP-U endpoint, for an IPv6
+        // session's router solicitations) sends through: "access" (default) or "core".
+        // "cp_function_interface": "access",
         "ue_ip_pool": "10.250.0.0/16"
     }
 }
