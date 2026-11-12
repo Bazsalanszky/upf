@@ -266,28 +266,36 @@ sessionQERLookup.set_default_gate(gate=qerFailGate)
 
 # Add logical pipeline when gtpuencap is needed
 farLookup:GTPUEncap \
-    -> gtpuEncap::GtpuEncap(add_psc=parser.gtppsc,
-                            access_ip6=access_ip6 or '',
-                            core_ip6=core_ip6 or ''):1 \
+    -> gtpuEncap::GtpuEncap(add_psc=parser.gtppsc):1 \
     -> outerL4Cksum::L4Checksum() \
     -> outerIPCksum::IPChecksum() \
     -> farMerge
 
 # A FAR whose tunnel peer is IPv6 keeps the peer in farLookup6, under the
-# same key, and farLookup sends its packets there (gate GTPUEncap6). They
-# reach gtpuEncap on input gate 1, which builds an IPv6 outer header; an
-# IPv4 peer stays in farLookup's six values and comes in on gate 0. pfcpiface
-# programs farLookup6 only when it hands out IPv6 F-TEIDs, so an IPv4-only
-# UPF leaves it empty.
+# same key, and farLookup sends its packets there (gate GTPUEncap6), on to
+# gtpuEncap6, which builds IPv6 outer headers from the UPF's IPv6 addresses.
+# A tunnel to an IPv4 peer stays in farLookup's six values and gtpuEncap,
+# unchanged. gtpuEncap6 is a separate instance because BESS gives an
+# attribute's reader an offset only if every path to it has a writer, and
+# farLookup does not write the IPv6 peer. pfcpiface programs farLookup6
+# only when it hands out IPv6 F-TEIDs, so an IPv4-only UPF leaves it empty.
 farLookup6::ExactMatch(fields=[{'attr_name':'far_id', 'num_bytes':4}, \
                                {'attr_name':'fseid', 'num_bytes':8}], \
                        values=[{'attr_name':'tunnel_out_dst_ip6_hi', 'num_bytes':8}, \
                                {'attr_name':'tunnel_out_dst_ip6_lo', 'num_bytes':8}],\
                        entries=parser.table_size_far_lookup)
 farLookup:GTPUEncap6 -> farLookup6
-farLookup6:GTPUEncap -> 1:gtpuEncap
 farLookup6:farFailGate -> farLookup6Fail::Sink()
 farLookup6.set_default_gate(gate=farFailGate)
+if access_ip6 or core_ip6:
+    farLookup6:GTPUEncap \
+        -> gtpuEncap6::GtpuEncap(add_psc=parser.gtppsc,
+                                 access_ip6=access_ip6 or '',
+                                 core_ip6=core_ip6 or ''):1 \
+        -> outerL4Cksum
+    gtpuEncap6:0 -> gtpuEncap6Fail::Sink()
+else:
+    farLookup6:GTPUEncap -> gtpuEncap6Fail::Sink()
 
 notify = UnixSocketPort(name='notifyCP', path=parser.notify_sockaddr)
 pfcpPort = UnixSocketPort(name='pfcpPort', path=parser.endmarker_sockaddr)
