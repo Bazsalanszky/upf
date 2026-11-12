@@ -22,6 +22,8 @@ noGTPUDecap = 0
 GTPUDecap = 1
 noGTPUEncap = 0
 GTPUEncap = 1
+# farLookup gate of a FAR whose tunnel peer is IPv6: on to farLookup6
+GTPUEncap6 = 3
 farForwardDAction = 0
 farForwardUAction = 1
 farDropAction = 2
@@ -44,6 +46,14 @@ macstr_d = None
 macstr_u = None
 access_ip = ips_by_interface(parser.access_ifname)
 core_ip = ips_by_interface(parser.core_ifname)
+# The IPv6 address GTP-U uses on each interface, if any (see tunnel_ipv6()).
+# Without one, the pipeline is the IPv4-only one it has always been.
+access_ip6 = tunnel_ipv6(parser.interfaces["access"], parser.access_ifname)
+core_ip6 = tunnel_ipv6(parser.interfaces["core"], parser.core_ifname)
+if not access_ip and not access_ip6:
+    exit(1, f"{parser.access_ifname}: no IPv4 or IPv6 address to terminate GTP-U on")
+print(f"GTP-U on {parser.access_ifname}: {access_ip + ([access_ip6] if access_ip6 else [])}, "
+      f"on {parser.core_ifname}: {core_ip + ([core_ip6] if core_ip6 else [])}")
 if parser.mode == 'sim':
     macstr_d = '00:00:00:00:00:02'
     macstr_u = '00:00:00:00:00:01'
@@ -114,7 +124,13 @@ for idx, iface in enumerate(interfaces):
     except TypeError:
         ext_addrs = None
 
-    p = port.Port(parser.interfaces[iface]["ifname"], parser.hwcksum, ext_addrs)
+    ifname = parser.interfaces[iface]["ifname"]
+    # A port routes IPv6 when it sends GTP-U over IPv6, or has a global
+    # IPv6 address to route from (see port.Port.init_ipv6_routes()).
+    ipv6 = parser.mode != 'sim' and bool(
+        (iface == 'access' and access_ip6) or (iface == 'core' and core_ip6)
+        or ip6s_by_interface(ifname))
+    p = port.Port(ifname, parser.hwcksum, ext_addrs, ipv6=ipv6)
     if p.name in ports:
         continue
 
@@ -255,6 +271,32 @@ farLookup:GTPUEncap \
     -> outerIPCksum::IPChecksum() \
     -> farMerge
 
+# A FAR whose tunnel peer is IPv6 keeps the peer in farLookup6, under the
+# same key, and farLookup sends its packets there (gate GTPUEncap6), on to
+# gtpuEncap6, which builds IPv6 outer headers from the UPF's IPv6 addresses.
+# A tunnel to an IPv4 peer stays in farLookup's six values and gtpuEncap,
+# unchanged. gtpuEncap6 is a separate instance because BESS gives an
+# attribute's reader an offset only if every path to it has a writer, and
+# farLookup does not write the IPv6 peer. pfcpiface programs farLookup6
+# only when it hands out IPv6 F-TEIDs, so an IPv4-only UPF leaves it empty.
+farLookup6::ExactMatch(fields=[{'attr_name':'far_id', 'num_bytes':4}, \
+                               {'attr_name':'fseid', 'num_bytes':8}], \
+                       values=[{'attr_name':'tunnel_out_dst_ip6_hi', 'num_bytes':8}, \
+                               {'attr_name':'tunnel_out_dst_ip6_lo', 'num_bytes':8}],\
+                       entries=parser.table_size_far_lookup)
+farLookup:GTPUEncap6 -> farLookup6
+farLookup6:farFailGate -> farLookup6Fail::Sink()
+farLookup6.set_default_gate(gate=farFailGate)
+if access_ip6 or core_ip6:
+    farLookup6:GTPUEncap \
+        -> gtpuEncap6::GtpuEncap(add_psc=parser.gtppsc,
+                                 access_ip6=access_ip6 or '',
+                                 core_ip6=core_ip6 or ''):1 \
+        -> outerL4Cksum
+    gtpuEncap6:0 -> gtpuEncap6Fail::Sink()
+else:
+    farLookup6:GTPUEncap -> gtpuEncap6Fail::Sink()
+
 notify = UnixSocketPort(name='notifyCP', path=parser.notify_sockaddr)
 pfcpPort = UnixSocketPort(name='pfcpPort', path=parser.endmarker_sockaddr)
 pfcpPI::PortInc(port='pfcpPort') -> pfcpPI_timestamp::Timestamp() -> ports[parser.access_ifname].rtr
@@ -342,14 +384,21 @@ if ports[parser.core_ifname].nat is not None:
 # setting filter to detect gtpu traffic
 # and dst host x.x.x.x                         # check S/PGWU IP
 # and udp dst port 2152                         # check GTPU port
-check_ip = "ip"
-check_spgwu_ip = " and dst host " + \
-    " or ".join(str(x) for x in core_ip)
 check_gtpu_port = " and udp dst port 2152"
 GTPUGate = 0 #ports[parser.core_ifname].bpf_gate()
-downlink_filter = {"priority": -GTPUGate, "filter": check_ip +
-               check_spgwu_ip + check_gtpu_port, "gate": GTPUGate}
-coreFastBPF.add(filters=[downlink_filter])
+if core_ip:
+    check_ip = "ip"
+    check_spgwu_ip = " and dst host " + \
+        " or ".join(str(x) for x in core_ip)
+    downlink_filter = {"priority": -GTPUGate, "filter": check_ip +
+                   check_spgwu_ip + check_gtpu_port, "gate": GTPUGate}
+    coreFastBPF.add(filters=[downlink_filter])
+if core_ip6:
+    # GTP-U from an N9 peer over IPv6. "udp" after "ip6" matches UDP as the
+    # next header only, as GtpuParser requires.
+    downlink_filter6 = {"priority": -GTPUGate, "filter": "ip6 and dst host " +
+                        core_ip6 + check_gtpu_port, "gate": GTPUGate}
+    coreFastBPF.add(filters=[downlink_filter6])
 
 
 # ====================================================
@@ -392,7 +441,8 @@ else:
 
 # 4. GTP Echo response pipeline
 accessFastBPF:GTPUEchoGate \
-    -> gtpuEcho::GtpuEcho(s1u_sgw_ip=ip2long(access_ip[0])):1 \
+    -> gtpuEcho::GtpuEcho(s1u_sgw_ip=ip2long(access_ip[0]) if access_ip else 0,
+                          ipv6=bool(access_ip6)):1 \
     -> ethSwap::MACSwap() \
     -> echoOuterL4Cksum::L4Checksum() \
     -> echoOuterIPCksum::IPChecksum() \
@@ -407,29 +457,44 @@ accessRxL4Cksum:1 -> accessRxL4CksumFail::Sink()
 # setting filter to detect gtpu traffic
 # and dst host 11.1.1.1                         # check S/PGWU IP
 # and udp dst port 2152                         # check GTPU port
-check_ip = "ip"
-check_spgwu_ip = " and dst host " + \
-    " or ".join(str(x) for x in access_ip)
 check_gtpu_port = " and udp dst port 2152"
-check_gtpu_msg_echo = " and udp[9] = 0x1"
-check_gtpu_msg_echo_res = " and udp[9] = 0x2"
+if access_ip:
+    check_ip = "ip"
+    check_spgwu_ip = " and dst host " + \
+        " or ".join(str(x) for x in access_ip)
+    check_gtpu_msg_echo = " and udp[9] = 0x1"
+    check_gtpu_msg_echo_res = " and udp[9] = 0x2"
 
-# Echo filter
-uplink_echo_filter = {"priority": GTPUEchoGate, "filter": check_ip +
-                      check_spgwu_ip + check_gtpu_port +
-                      check_gtpu_msg_echo, "gate": GTPUEchoGate}
-accessFastBPF.add(filters=[uplink_echo_filter])
-
-# Echo Response filter
-uplink_echo_res_filter = {"priority": GTPUEchoResGate, "filter": check_ip +
+    # Echo filter
+    uplink_echo_filter = {"priority": GTPUEchoGate, "filter": check_ip +
                           check_spgwu_ip + check_gtpu_port +
-                          check_gtpu_msg_echo_res, "gate": GTPUEchoResGate}
-accessFastBPF.add(filters=[uplink_echo_res_filter])
+                          check_gtpu_msg_echo, "gate": GTPUEchoGate}
+    accessFastBPF.add(filters=[uplink_echo_filter])
 
-# PDU rule
-uplink_filter = {"priority": -GTPUGate, "filter": check_ip +
-               check_spgwu_ip + check_gtpu_port, "gate": GTPUGate}
-accessFastBPF.add(filters=[uplink_filter])
+    # Echo Response filter
+    uplink_echo_res_filter = {"priority": GTPUEchoResGate, "filter": check_ip +
+                              check_spgwu_ip + check_gtpu_port +
+                              check_gtpu_msg_echo_res, "gate": GTPUEchoResGate}
+    accessFastBPF.add(filters=[uplink_echo_res_filter])
+
+    # PDU rule
+    uplink_filter = {"priority": -GTPUGate, "filter": check_ip +
+                   check_spgwu_ip + check_gtpu_port, "gate": GTPUGate}
+    accessFastBPF.add(filters=[uplink_filter])
+
+if access_ip6:
+    # The same three over IPv6. libpcap's udp[] indexing is IPv4 only (under
+    # ip6 it rejects every packet), so the GTP message type is read at its
+    # offset from the fixed IPv6 header: 40 + 8 (UDP) + 1. "udp" after "ip6"
+    # matches UDP as the next header only, so that offset holds.
+    check_spgwu_ip6 = "ip6 and dst host " + access_ip6 + check_gtpu_port
+    accessFastBPF.add(filters=[
+        {"priority": GTPUEchoGate, "filter": check_spgwu_ip6 + " and ip6[49] = 0x1",
+         "gate": GTPUEchoGate},
+        {"priority": GTPUEchoResGate, "filter": check_spgwu_ip6 + " and ip6[49] = 0x2",
+         "gate": GTPUEchoResGate},
+        {"priority": -GTPUGate, "filter": check_spgwu_ip6, "gate": GTPUGate},
+    ])
 
 
 # ====================================================
@@ -438,17 +503,29 @@ accessFastBPF.add(filters=[uplink_filter])
 
 # Create GTP Echo Request packets
 if parser.enable_gtpu_path_monitoring:
-    gtpuSrc::Source() -> gtpuEchoReq::Rewrite(templates=[gtp_echo_request(access_ip[0])]) \
-                      -> gtpuPathMonitoring::GtpuPathMonitoring() \
-                      -> gtpuL4Cksum::L4Checksum() -> gtpuIPCksum::IPChecksum() \
-                      -> ports[parser.access_ifname].rtr
-    gtpuSrc.set_burst(burst=1)
-
-    bess.add_tc('schedule_limit',
-                policy='rate_limit',
-                resource='count',
-                limit={'count': 1}, wid=0)
-    gtpuSrc.attach_task(parent='schedule_limit')
+    # One echo request template per family the access interface has; the
+    # module copies each to the gNBs of its family.
+    gtpuPathMonitoring::GtpuPathMonitoring() \
+        -> gtpuL4Cksum::L4Checksum() -> gtpuIPCksum::IPChecksum() \
+        -> ports[parser.access_ifname].rtr
+    if access_ip:
+        gtpuSrc::Source() -> gtpuEchoReq::Rewrite(templates=[gtp_echo_request(access_ip[0])]) \
+                          -> gtpuPathMonitoring
+        gtpuSrc.set_burst(burst=1)
+        bess.add_tc('schedule_limit',
+                    policy='rate_limit',
+                    resource='count',
+                    limit={'count': 1}, wid=0)
+        gtpuSrc.attach_task(parent='schedule_limit')
+    if access_ip6:
+        gtpuSrc6::Source() -> gtpuEchoReq6::Rewrite(templates=[gtp_echo_request6(access_ip6)]) \
+                           -> gtpuPathMonitoring
+        gtpuSrc6.set_burst(burst=1)
+        bess.add_tc('schedule_limit6',
+                    policy='rate_limit',
+                    resource='count',
+                    limit={'count': 1}, wid=0)
+        gtpuSrc6.attach_task(parent='schedule_limit6')
 
     # Process GTP Echo Response packets
     accessFastBPF:GTPUEchoResGate -> gtpuPathMonitoring

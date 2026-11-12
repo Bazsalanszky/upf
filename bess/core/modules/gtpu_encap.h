@@ -7,6 +7,7 @@
 /*----------------------------------------------------------------------------------*/
 #include "../module.h"
 #include "../pb/module_msg.pb.h"
+#include "../utils/ip.h"
 #include <atomic>
 #include <rte_hash.h>
 /*----------------------------------------------------------------------------------*/
@@ -29,6 +30,22 @@ class GtpuEncap final : public Module {
   int tout_dip_attr = -1;
   int tout_teid = -1;
   int tout_uport = -1;
+  /* The IPv6 peer, when the FAR has one (see Init()) */
+  int tout_dip6_hi_attr = -1;
+  int tout_dip6_lo_attr = -1;
+  /* The UPF's own IPv6 addresses an IPv6 outer header is sent from */
+  struct Ipv6Source {
+    bool set = false;
+    uint8_t addr[16] = {};
+  };
+  Ipv6Source access_ip6_;
+  Ipv6Source core_ip6_;
+  /* With an IPv6 source, this instance builds IPv6 outer headers, to the
+   * peer in the tunnel_out_dst_ip6 attributes; without, IPv4 ones. */
+  bool outer6_ = false;
+  bool FillIpv6(bess::utils::Ipv6 *ip6h, uint8_t action, uint64_t dst_hi,
+                uint64_t dst_lo, uint8_t traffic_class,
+                uint16_t payload_len) const;
   /* ID of the next outer IPv4 header; see ProcessBatch() */
   std::atomic<uint16_t> next_ip_id{0};
 };
