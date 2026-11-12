@@ -31,7 +31,10 @@
 
 #include "ip.h"
 
+#include <arpa/inet.h>
 #include <glog/logging.h>
+
+#include <cstring>
 
 #include "bits.h"
 #include "format.h"
@@ -60,6 +63,23 @@ std::string ToIpv4Address(be32_t addr) {
 
   return bess::utils::Format("%hhu.%hhu.%hhu.%hhu", t.bytes[0], t.bytes[1],
                              t.bytes[2], t.bytes[3]);
+}
+
+bool ParseIpv6Address(const std::string &str, uint8_t addr[16]) {
+  uint8_t parsed[16];
+  if (inet_pton(AF_INET6, str.c_str(), parsed) != 1) {
+    return false;
+  }
+  memcpy(addr, parsed, sizeof(parsed));
+  return true;
+}
+
+std::string ToIpv6Address(const uint8_t addr[16]) {
+  char buf[INET6_ADDRSTRLEN];
+  if (inet_ntop(AF_INET6, addr, buf, sizeof(buf)) == nullptr) {
+    return "";
+  }
+  return buf;
 }
 
 Ipv4Prefix::Ipv4Prefix(const std::string &prefix) {
