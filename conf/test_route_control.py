@@ -16,9 +16,13 @@ from conf.route_control import (
     RouteController,
     RouteEntry,
     fetch_mac,
+    get_route_module_name,
+    lookup_arg_class,
     mac_to_hex,
     mac_to_int,
     route_key,
+    scoped_next_hop,
+    send_ping,
     validate_ipv4,
 )
 
@@ -48,6 +52,19 @@ class BessControllerMock:
 
     def link_modules(self, *args, **kwargs) -> None:
         pass
+
+    def module_exists(self, *args, **kwargs) -> bool:
+        return False
+
+
+def bess_controller_mock(ipv6_interfaces=()) -> Mock:
+    """A BessController mock whose BESS has an IPv6 route module
+    ({name}Routes6) for the interfaces given, and none for the rest."""
+    mock = Mock(BessControllerMock)
+    mock.module_exists.side_effect = lambda name: any(
+        name == f"{interface}Routes6" for interface in ipv6_interfaces
+    )
+    return mock
 
 
 @patch("conf.route_control.BessController", BessControllerMock)
@@ -91,7 +108,7 @@ class TestUtilityFunctions(unittest.TestCase):
 
 class TestRouteController(unittest.TestCase):
     def setUp(self):
-        self.mock_bess_controller = Mock(BessControllerMock)
+        self.mock_bess_controller = bess_controller_mock()
         self.ndb = Mock()
         self.ipr = Mock()
         interfaces = ["access", "core"]
@@ -478,7 +495,7 @@ class TestOnLinkNetworks(unittest.TestCase):
     """Tests routes for networks attached to a watched interface."""
 
     def setUp(self):
-        self.mock_bess_controller = Mock(BessControllerMock)
+        self.mock_bess_controller = bess_controller_mock()
         self.ndb = Mock()
         self.ipr = Mock()
         self.route_controller = RouteController(
@@ -949,7 +966,7 @@ class TestNetlinkEventThread(unittest.TestCase):
     TIMEOUT_S = 5
 
     def setUp(self):
-        self.mock_bess_controller = Mock(BessControllerMock)
+        self.mock_bess_controller = bess_controller_mock()
         self.ndb = ThreadRecordingNdb(
             ifname="core",
             neighbors=[{"dst": "172.31.48.1", "lladdr": DEFAULT_MAC_ADDRESS}],
@@ -1115,7 +1132,7 @@ class TestStartupOverlap(unittest.TestCase):
     GATEWAY = "172.31.48.1"
 
     def setUp(self):
-        self.mock_bess_controller = Mock(BessControllerMock)
+        self.mock_bess_controller = bess_controller_mock()
         self.ndb = Mock()
         self.ndb.interfaces = {2: {"ifname": "core"}}
         self.ipr = Mock()
@@ -1514,7 +1531,7 @@ class TestPendingRoutes(unittest.TestCase):
     NEXT_HOP_MAC = "00:16:3e:00:00:07"
 
     def setUp(self):
-        self.mock_bess_controller = Mock(BessControllerMock)
+        self.mock_bess_controller = bess_controller_mock()
         self.route_controller = RouteController(
             self.mock_bess_controller,
             Mock(),
@@ -1624,3 +1641,252 @@ class TestPendingRoutes(unittest.TestCase):
             self.route_controller._ping_missing_entries()
 
         mock_send_ping.assert_called_once_with(self.NEXT_HOP)
+
+
+class TestIpv6Routes(unittest.TestCase):
+    """IPv6 routes on an interface with an IPv6 route module (accessRoutes6),
+    and none on one without (core)."""
+
+    ROUTER_MAC = "00:aa:bb:cc:dd:01"
+    GNB_MAC = "00:aa:bb:cc:dd:10"
+
+    def setUp(self):
+        self.mock_bess_controller = bess_controller_mock(ipv6_interfaces=["access"])
+        self.ndb = Mock()
+        self.ipr = Mock()
+        self.ipr.get_routes.return_value = []
+        self.route_controller = RouteController(
+            self.mock_bess_controller,
+            self.ndb,
+            interfaces=["access", "core"],
+            ipr=self.ipr,
+        )
+        self.ndb.interfaces = {2: {"ifname": "access"}, 3: {"ifname": "core"}}
+        self.ndb.neighbours.dump.return_value = []
+        names = {2: "access", 3: "core"}
+
+        def ifname(index):
+            try:
+                return names[int(index)]
+            except KeyError:
+                raise OSError("no such interface") from None
+
+        for target, side_effect in (
+            ("conf.route_control.if_indextoname", ifname),
+            (
+                "conf.route_control.if_nametoindex",
+                lambda n: {v: k for k, v in names.items()}[n],
+            ),
+        ):
+            patcher = patch(target, side_effect=side_effect)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        self.route_controller.bootstrap_routes()
+
+    @staticmethod
+    def route_msg(dst=None, dst_len=64, oif=2, gateway=None, **extra):
+        attrs = [("RTA_OIF", oif)]
+        if dst is not None:
+            attrs.append(("RTA_DST", dst))
+        if gateway is not None:
+            attrs.append(("RTA_GATEWAY", gateway))
+        msg = {
+            "family": 10,
+            "dst_len": dst_len,
+            "attrs": attrs,
+            "event": "RTM_NEWROUTE",
+        }
+        msg.update(extra)
+        return msg
+
+    def added(self):
+        return [
+            (call.args[0], call.kwargs["module_name"])
+            for call in self.mock_bess_controller.add_route_to_module.call_args_list
+        ]
+
+    def test_bootstrap_reads_ipv6_routes_only_with_an_ipv6_route_module(self):
+        families = [c.kwargs["family"] for c in self.ipr.get_routes.call_args_list]
+        self.assertEqual(families, [2, 10])
+
+        controller = RouteController(
+            bess_controller_mock(), self.ndb, interfaces=["access"], ipr=Mock()
+        )
+        controller._ipr.get_routes.return_value = []
+        controller.bootstrap_routes()
+        self.assertEqual(
+            [c.kwargs["family"] for c in controller._ipr.get_routes.call_args_list], [2]
+        )
+
+    def test_ipv6_default_route_parses_to_its_own_default(self):
+        entry = self.route_controller._parse_route_entry_msg(
+            self.route_msg(dst_len=0, gateway="2001:db8:630::232")
+        )
+        self.assertEqual(entry.dest_prefix, "::")
+        self.assertNotEqual(route_key(entry), ("access", "0.0.0.0", 0))
+
+    def test_link_local_next_hop_is_scoped_by_its_interface(self):
+        entry = self.route_controller._parse_route_entry_msg(
+            self.route_msg(dst_len=0, gateway="fe80::1")
+        )
+        self.assertEqual(entry.next_hop_ip, "fe80::1%access")
+        self.assertEqual(scoped_next_hop("2001:db8::1", "access"), "2001:db8::1")
+        self.assertEqual(scoped_next_hop("10.0.0.1", "access"), "10.0.0.1")
+
+    @patch("conf.route_control.fetch_mac")
+    def test_gateway_route_goes_to_the_ipv6_route_module(self, mock_fetch_mac):
+        mock_fetch_mac.return_value = self.ROUTER_MAC
+        entry = self.route_controller._parse_route_entry_msg(
+            self.route_msg(dst="2001:db8:66::", dst_len=48, gateway="fe80::1")
+        )
+        self.route_controller.add_new_route_entry(entry)
+        [(added, module)] = self.added()
+        self.assertEqual(module, "accessRoutes6")
+        self.assertEqual((added.dest_prefix, added.prefix_len), ("2001:db8:66::", 48))
+        self.mock_bess_controller.link_modules.assert_any_call(
+            "accessRoutes6", "accessDstMAC00AABBCCDD01", 0, 0
+        )
+
+    @patch("conf.route_control.fetch_mac")
+    def test_ipv6_route_on_an_interface_without_an_ipv6_module_is_ignored(
+        self, mock_fetch_mac
+    ):
+        mock_fetch_mac.return_value = self.ROUTER_MAC
+        entry = self.route_controller._parse_route_entry_msg(
+            self.route_msg(dst_len=0, gateway="2001:db8:660::1", oif=3)
+        )
+        self.route_controller.add_new_route_entry(entry)
+        self.route_controller.delete_route_entry(entry)
+        self.mock_bess_controller.add_route_to_module.assert_not_called()
+        self.mock_bess_controller.delete_module_route_entry.assert_not_called()
+
+    def test_attached_ipv6_network_gets_a_128_per_host_and_skips_link_local(self):
+        self.ndb.neighbours.dump.return_value = [
+            {"ifindex": 2, "dst": "2001:db8:630::10", "lladdr": self.GNB_MAC},
+            {"ifindex": 2, "dst": "fe80::10", "lladdr": self.GNB_MAC},
+            {"ifindex": 2, "dst": "10.10.3.10", "lladdr": self.GNB_MAC},
+        ]
+        for msg in (
+            self.route_msg(dst="2001:db8:630::", dst_len=64),
+            self.route_msg(dst="fe80::", dst_len=64),
+            self.route_msg(dst="ff00::", dst_len=8),
+        ):
+            self.route_controller.add_new_route_entry(
+                self.route_controller._parse_route_entry_msg(msg)
+            )
+        [(added, module)] = self.added()
+        self.assertEqual(module, "accessRoutes6")
+        self.assertEqual(
+            (added.dest_prefix, added.prefix_len, added.next_hop_ip),
+            ("2001:db8:630::10", 128, "2001:db8:630::10"),
+        )
+
+        # The host appearing later is added the same way, and the network
+        # going away withdraws it from the IPv6 module.
+        self.route_controller.add_unresolved_new_neighbor(
+            {
+                "ifindex": 2,
+                "attrs": [
+                    ("NDA_DST", "2001:db8:630::11"),
+                    ("NDA_LLADDR", "00:aa:bb:cc:dd:11"),
+                ],
+            }
+        )
+        self.assertEqual(self.added()[-1][0].dest_prefix, "2001:db8:630::11")
+        delete = self.route_controller._parse_route_entry_msg(
+            self.route_msg(dst="2001:db8:630::", dst_len=64, event="RTM_DELROUTE")
+        )
+        self.route_controller.delete_route_entry(delete)
+        deleted = sorted(
+            c.args[0].dest_prefix
+            for c in self.mock_bess_controller.delete_module_route_entry.call_args_list
+        )
+        self.assertEqual(deleted, ["2001:db8:630::10", "2001:db8:630::11"])
+
+    @patch("conf.route_control.send_ping")
+    @patch("conf.route_control.fetch_mac")
+    def test_unresolved_link_local_next_hop_waits_for_its_neighbour(
+        self, mock_fetch_mac, mock_send_ping
+    ):
+        mock_fetch_mac.return_value = None
+        entry = self.route_controller._parse_route_entry_msg(
+            self.route_msg(dst_len=0, gateway="fe80::1")
+        )
+        self.route_controller.add_new_route_entry(entry)
+        mock_send_ping.assert_called_once_with("fe80::1%access")
+        self.mock_bess_controller.add_route_to_module.assert_not_called()
+
+        # fe80::1 resolving on another interface is another next hop.
+        self.route_controller.add_unresolved_new_neighbor(
+            {
+                "ifindex": 3,
+                "attrs": [("NDA_DST", "fe80::1"), ("NDA_LLADDR", self.ROUTER_MAC)],
+            }
+        )
+        self.mock_bess_controller.add_route_to_module.assert_not_called()
+        self.route_controller.add_unresolved_new_neighbor(
+            {
+                "ifindex": 2,
+                "attrs": [("NDA_DST", "fe80::1"), ("NDA_LLADDR", self.ROUTER_MAC)],
+            }
+        )
+        [(added, module)] = self.added()
+        self.assertEqual((added.dest_prefix, module), ("::", "accessRoutes6"))
+
+    @patch("conf.route_control.fetch_mac")
+    def test_next_hops_with_one_mac_share_an_update_module(self, mock_fetch_mac):
+        # A router's IPv4 address and its link-local IPv6 one.
+        mock_fetch_mac.return_value = self.ROUTER_MAC
+        v4 = RouteEntry(
+            next_hop_ip="10.10.3.232",
+            interface="access",
+            dest_prefix="0.0.0.0",
+            prefix_len=0,
+        )
+        v6 = self.route_controller._parse_route_entry_msg(
+            self.route_msg(dst_len=0, gateway="fe80::1")
+        )
+        self.route_controller.add_new_route_entry(v4)
+        self.route_controller.add_new_route_entry(v6)
+        self.mock_bess_controller.create_module.assert_called_once()
+        links = [c.args for c in self.mock_bess_controller.link_modules.call_args_list]
+        self.assertEqual(
+            links,
+            [
+                ("accessRoutes", "accessDstMAC00AABBCCDD01", 0, 0),
+                ("accessDstMAC00AABBCCDD01", "accessMerge", 0, 0),
+                ("accessRoutes6", "accessDstMAC00AABBCCDD01", 0, 0),
+            ],
+        )
+
+        # The module stays while either uses it, and goes with the last.
+        self.route_controller.delete_route_entry(v4)
+        self.mock_bess_controller.delete_module.assert_not_called()
+        self.route_controller.delete_route_entry(v6)
+        self.mock_bess_controller.delete_module.assert_called_once_with(
+            "accessDstMAC00AABBCCDD01"
+        )
+
+    def test_lookup_commands_by_family(self):
+        self.assertEqual(lookup_arg_class("10.0.0.0", "Add"), "IPLookupCommandAddArg")
+        self.assertEqual(
+            lookup_arg_class("2001:db8::", "Delete"), "IP6LookupCommandDeleteArg"
+        )
+        self.assertEqual(get_route_module_name("access", 6), "accessRoutes6")
+        self.assertEqual(get_route_module_name("access"), "accessRoutes")
+
+    def test_fetch_mac_matches_a_link_local_neighbour_on_its_interface(self):
+        self.ndb.neighbours.dump.return_value = [
+            {"ifindex": 3, "dst": "fe80::1", "lladdr": "00:00:00:00:00:03"},
+            {"ifindex": 2, "dst": "fe80::1", "lladdr": "00:00:00:00:00:02"},
+        ]
+        self.assertEqual(fetch_mac(self.ndb, "fe80::1%access"), "00:00:00:00:00:02")
+        self.assertEqual(fetch_mac(self.ndb, "fe80::1%core"), "00:00:00:00:00:03")
+
+    @patch("conf.route_control.socket.socket")
+    def test_ipv6_neighbour_is_probed_by_a_datagram(self, mock_socket):
+        sock = mock_socket.return_value.__enter__.return_value
+        send_ping("fe80::1%access")
+        sock.sendto.assert_called_once_with(b"", ("fe80::1", 9, 0, 2))
+        send_ping("2001:db8:630::10")
+        sock.sendto.assert_called_with(b"", ("2001:db8:630::10", 9, 0, 0))

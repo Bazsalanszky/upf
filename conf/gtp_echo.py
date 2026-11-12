@@ -8,8 +8,16 @@ from scapy.packet import *
 
 def gtp_echo_request(src_ip):
     # use scapy to build a GTP-U Echo Request packet template
+    return _gtp_echo_request(scapy.IP(src=src_ip))  # dst IP is overwritten
+
+
+def gtp_echo_request6(src_ip6):
+    # The same over IPv6; GtpuPathMonitoring fills in the destination.
+    return _gtp_echo_request(scapy.IPv6(src=src_ip6, dst="::"))
+
+
+def _gtp_echo_request(ip):
     eth = scapy.Ether()
-    ip = scapy.IP(src=src_ip)  # dst IP is overwritten
     udp = scapy.UDP(sport=2152, dport=2152)
     gtp = GTPHeader(gtp_type=1, seq=0)
     gtp_echo = GTPEchoRequest()
