@@ -118,7 +118,7 @@ type bess struct {
 
 	// The FARs with an entry in farLookup6, so that one that moves to an IPv4 peer or
 	// goes away has it deleted. ipv6Tunnels says the UPF has an IPv6 GTP-U address,
-	// and so the pipeline the table (SetUpfInfo).
+	// and so that the pipeline has the table (SetUpfInfo).
 	far6Mu      sync.Mutex
 	far6        map[pathMonitoringKey]struct{}
 	ipv6Tunnels bool
