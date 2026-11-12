@@ -5,7 +5,6 @@
 package pfcpiface
 
 import (
-	"errors"
 	"fmt"
 	"math"
 	"net"
@@ -315,6 +314,14 @@ type pdr struct {
 	tunnelTEIDMask uint32
 
 	appFilter applicationFilter
+	// noIPv4Rule says the PDR's filter names IPv6 addresses only: it matches no IPv4
+	// packet, and appFilter is not a rule.
+	noIPv4Rule bool
+	// appFilter6 is the match for the PDR's IPv6 packets, when hasIPv6Rule says it has
+	// one: the UE has an IPv6 prefix, or the filter names IPv6 addresses. Parsed, not
+	// installed: see checkDatapathSupport.
+	appFilter6  applicationFilter
+	hasIPv6Rule bool
 
 	precedence  uint32
 	pdrID       uint32
@@ -507,15 +514,6 @@ func parseUEIPv6(f *ie.UEIPAddressFields) (netip.Prefix, error) {
 	return netip.PrefixFrom(a, bits), nil
 }
 
-// ueAddrString is the UE address as parseFlowDesc takes it: empty for none.
-func ueAddrString(a netip.Addr) string {
-	if !a.IsValid() {
-		return ""
-	}
-
-	return a.String()
-}
-
 func (p *pdr) parseSourceInterfaceIE(srcIfaceIE *ie.IE) error {
 	srcIface, err := srcIfaceIE.SourceInterface()
 	if err != nil {
@@ -588,24 +586,17 @@ func (p *pdr) parseApplicationID(ie *ie.IE, appPFDs map[string]appPFD) error {
 		logger := logger.PfcpLog.With("Application ID", apfd.appID, "Flow Description", flowDesc)
 		logger.Debug("Parsing flow description of Application ID IE")
 
-		ipf, err := parseFlowDesc(flowDesc, ueAddrString(p.ueAddress))
+		ipf, err := parseFlowDesc(flowDesc)
 		if err != nil {
-			return errBadFilterDesc
+			return fmt.Errorf("%w: %q: %w", errBadFilterDesc, flowDesc, err)
 		}
 
 		if (p.srcIface == access && ipf.direction == filterDirectionOut) ||
 			(p.srcIface == core && ipf.direction == filterDirectionIn) {
 			logger.Debug("Found a matching flow description")
 
-			if ipf.proto != reservedProto {
-				p.appFilter.proto = ipf.proto
-				p.appFilter.protoMask = math.MaxUint8
-			}
 			// TODO: Verify assumption that flow description in case of PFD is to be taken as-is
-			p.appFilter.dstIP = prefixFromIPNet(ipf.dst.IPNet)
-			p.appFilter.srcIP = prefixFromIPNet(ipf.src.IPNet)
-			p.appFilter.dstPortRange = ipf.dst.ports
-			p.appFilter.srcPortRange = ipf.src.ports
+			p.applyFlow(ipf, ipf.src, ipf.dst, nil)
 
 			return nil
 		}
@@ -639,45 +630,84 @@ func (p *pdr) parseSDFFilter(ie *ie.IE) error {
 
 	logger.PfcpLog.With("Flow Description", flowDesc).Debugln("parsing Flow Description from SDF Filter")
 
-	ipf, err := parseFlowDesc(flowDesc, ueAddrString(p.ueAddress))
+	ipf, err := parseFlowDesc(flowDesc)
 	if err != nil {
-		return errBadFilterDesc
-	}
-
-	if ipf.proto != reservedProto {
-		p.appFilter.proto = ipf.proto
-		p.appFilter.protoMask = math.MaxUint8
+		return fmt.Errorf("%w: %q: %w", errBadFilterDesc, flowDesc, err)
 	}
 
 	switch p.srcIface {
 	case core:
-		p.appFilter.dstIP = prefixFromIPNet(ipf.dst.IPNet)
-		p.appFilter.srcIP = prefixFromIPNet(ipf.src.IPNet)
-		p.appFilter.dstPortRange = ipf.dst.ports
-		p.appFilter.srcPortRange = ipf.src.ports
-
-		// TODO: temporary workaround for SDF Filter,
-		//  remove once we meet spec compliance
-		if !p.appFilter.dstPortRange.isWildcardMatch() {
-			p.appFilter.srcPortRange = p.appFilter.dstPortRange
-			p.appFilter.dstPortRange = newWildcardPortRange()
-		}
+		p.applyFlow(ipf, ipf.src, ipf.dst, func(af *applicationFilter) {
+			// TODO: temporary workaround for SDF Filter,
+			//  remove once we meet spec compliance
+			if !af.dstPortRange.isWildcardMatch() {
+				af.srcPortRange = af.dstPortRange
+				af.dstPortRange = newWildcardPortRange()
+			}
+		})
 	case access:
-		p.appFilter.srcIP = prefixFromIPNet(ipf.dst.IPNet)
-		p.appFilter.dstIP = prefixFromIPNet(ipf.src.IPNet)
-		// Ports are flipped for access PDRs
-		p.appFilter.dstPortRange = ipf.src.ports
-		p.appFilter.srcPortRange = ipf.dst.ports
-
-		// TODO: temporary workaround for SDF Filter,
-		//  remove once we meet spec compliance
-		if !p.appFilter.srcPortRange.isWildcardMatch() {
-			p.appFilter.dstPortRange = p.appFilter.srcPortRange
-			p.appFilter.srcPortRange = newWildcardPortRange()
-		}
+		// Addresses and ports are flipped for access PDRs
+		p.applyFlow(ipf, ipf.dst, ipf.src, func(af *applicationFilter) {
+			// TODO: temporary workaround for SDF Filter,
+			//  remove once we meet spec compliance
+			if !af.srcPortRange.isWildcardMatch() {
+				af.dstPortRange = af.srcPortRange
+				af.srcPortRange = newWildcardPortRange()
+			}
+		})
 	}
 
 	return nil
+}
+
+// applyFlow sets the PDR's application filters from a flow rule. src and dst are the
+// rule's endpoints in the order the filter's source and destination take them, and
+// adjust, when given, is applied to each filter set.
+//
+// A rule is applied once per address family it covers. One that names IPv4 addresses
+// is the IPv4 filter alone, one that names IPv6 addresses the IPv6 filter alone, and
+// one that names none ("any", "assigned") is both -- the IPv6 one only for a UE with an
+// IPv6 prefix. "assigned" is the UE's address of the filter's family.
+func (p *pdr) applyFlow(ipf *ipFilterRule, src, dst endpoint, adjust func(*applicationFilter)) {
+	set := func(af *applicationFilter, ue netip.Prefix) {
+		if ipf.proto != reservedProto {
+			af.proto = ipf.proto
+			af.protoMask = math.MaxUint8
+		}
+
+		af.srcIP = src.matchFor(ue)
+		af.dstIP = dst.matchFor(ue)
+		af.srcPortRange = src.ports
+		af.dstPortRange = dst.ports
+
+		if adjust != nil {
+			adjust(af)
+		}
+	}
+
+	family := ipf.family()
+
+	p.noIPv4Rule = family == 6
+	if !p.noIPv4Rule {
+		set(&p.appFilter, p.ueIPv4Match())
+	}
+
+	p.hasIPv6Rule = family == 6 || family == 0 && p.ueIPv6.IsValid()
+	if p.hasIPv6Rule {
+		set(&p.appFilter6, p.ueIPv6.Masked())
+	} else {
+		p.appFilter6 = applicationFilter{}
+	}
+}
+
+// ueIPv4Match is what the UE's IPv4 address matches as: itself, or any address when the
+// PDR names none.
+func (p pdr) ueIPv4Match() netip.Prefix {
+	if isZeroAddr(p.ueAddress) {
+		return netip.Prefix{}
+	}
+
+	return hostPrefix(p.ueAddress)
 }
 
 func (p *pdr) parsePDI(pdiIEs []*ie.IE, appPFDs map[string]appPFD, ippool *IPPool) error {
@@ -690,6 +720,17 @@ func (p *pdr) parsePDI(pdiIEs []*ie.IE, appPFDs map[string]appPFD, ippool *IPPoo
 		p.appFilter.dstIP = hostPrefix(p.ueAddress)
 	} else if p.IsUplink() && !isZeroAddr(p.ueAddress) {
 		p.appFilter.srcIP = hostPrefix(p.ueAddress)
+	}
+
+	// The same for the UE's IPv6 prefix: the UE may use any address in it.
+	if p.ueIPv6.IsValid() && (p.IsDownlink() || p.IsUplink()) {
+		p.hasIPv6Rule = true
+
+		if p.IsDownlink() {
+			p.appFilter6.dstIP = p.ueIPv6.Masked()
+		} else {
+			p.appFilter6.srcIP = p.ueIPv6.Masked()
+		}
 	}
 
 	// make another iteration because Application ID and SDF Filter depend on UE IP Address IE
@@ -810,6 +851,10 @@ func (p pdr) checkDatapathSupport() error {
 		return ErrUnsupported("PDR for an IPv6-only UE address", p.ueIPv6)
 	}
 
+	if p.noIPv4Rule {
+		return ErrUnsupported("PDR whose filter matches IPv6 only", p.appFilter6)
+	}
+
 	if p.tunnelIPv6Dst.IsValid() && !p.tunnelIPDst.IsValid() {
 		return ErrUnsupported("PDR on an IPv6-only F-TEID", p.tunnelIPv6Dst)
 	}
@@ -859,8 +904,10 @@ func (p *pdr) parseCorePDRFields(
 		}
 	}
 
+	// A filter that does not parse refuses the PDR. It used to be installed without the
+	// filter, matching what the filter was there to exclude.
 	err = p.parsePDI(pdi, appPFDs, ippool)
-	if err != nil && !errors.Is(err, errBadFilterDesc) {
+	if err != nil {
 		return 0, 0, 0, 0, err
 	}
 

@@ -68,34 +68,6 @@ func matchPrefix(p netip.Prefix) netip.Prefix {
 	return p.Masked()
 }
 
-// prefixFromIPNet converts a network parsed by the net package into a match prefix. A nil
-// network gives the zero Prefix.
-func prefixFromIPNet(n *net.IPNet) netip.Prefix {
-	if n == nil {
-		return netip.Prefix{}
-	}
-
-	a := addrFromIP(n.IP)
-	if !a.IsValid() {
-		return netip.Prefix{}
-	}
-
-	ones, bits := n.Mask.Size()
-	if bits == 0 {
-		// A non-canonical mask.
-		return netip.Prefix{}
-	}
-
-	// A 4-byte address with a 16-byte mask, or the reverse, counts the prefix in the
-	// mask's family; the address's family is the one kept.
-	ones -= bits - a.BitLen()
-	if ones < 0 {
-		ones = 0
-	}
-
-	return matchPrefix(netip.PrefixFrom(a, ones))
-}
-
 // ipv4Field returns the value a 32-bit datapath field carries for a. The zero Addr is 0,
 // as is the unspecified address. An IPv6 address is an error: the datapath has no field
 // for it, and any 32 bits of it would name a different host.
