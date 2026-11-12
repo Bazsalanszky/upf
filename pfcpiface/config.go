@@ -98,8 +98,48 @@ type CPIfaceInfo struct {
 }
 
 // IfaceType : Gateway interface struct.
+//
+// The N3 (access) and N9 (core) addresses are the interface's own: its first IPv4
+// address and its first global IPv6 address. IPv4 and IPv6 name them explicitly, for an
+// interface with more than one. TransportFamily restricts the GTP-U tunnels the UPF
+// offers on it to one family ("ipv4" or "ipv6"); empty offers every family the
+// interface has an address of. The same keys configure the BESS pipeline (up4.bess).
 type IfaceType struct {
-	IfName string `json:"ifname"`
+	IfName          string `json:"ifname"`
+	IPv4            string `json:"ipv4"`
+	IPv6            string `json:"ipv6"`
+	TransportFamily string `json:"transport_family"`
+}
+
+// Values of IfaceType.TransportFamily.
+const (
+	transportFamilyAny  = ""
+	transportFamilyIPv4 = "ipv4"
+	transportFamilyIPv6 = "ipv6"
+)
+
+// validateIface checks the address keys of an interface.
+func validateIface(name string, iface IfaceType) error {
+	switch iface.TransportFamily {
+	case transportFamilyAny, transportFamilyIPv4, transportFamilyIPv6:
+	default:
+		return ErrInvalidArgumentWithReason("conf."+name+".transport_family", iface.TransportFamily,
+			`not "ipv4", "ipv6" or empty`)
+	}
+
+	if iface.IPv4 != "" {
+		if a, err := netip.ParseAddr(iface.IPv4); err != nil || !a.Is4() {
+			return ErrInvalidArgumentWithReason("conf."+name+".ipv4", iface.IPv4, "not an IPv4 address")
+		}
+	}
+
+	if iface.IPv6 != "" {
+		if a, err := netip.ParseAddr(iface.IPv6); err != nil || !a.Is6() || a.Is4In6() || !a.IsGlobalUnicast() {
+			return ErrInvalidArgumentWithReason("conf."+name+".ipv6", iface.IPv6, "not a global IPv6 address")
+		}
+	}
+
+	return nil
 }
 
 // validateConf checks that the given config reaches a baseline of correctness.
@@ -119,6 +159,12 @@ func validateConf(conf Conf) error {
 		return err
 	}
 	if err := validateN4Addresses(conf); err != nil {
+		return err
+	}
+	if err := validateIface("access", conf.AccessIface); err != nil {
+		return err
+	}
+	if err := validateIface("core", conf.CoreIface); err != nil {
 		return err
 	}
 	if err := validateTimeouts(conf); err != nil {

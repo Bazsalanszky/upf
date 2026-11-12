@@ -6,6 +6,7 @@ package pfcpiface
 
 import (
 	"net"
+	"net/netip"
 	"strconv"
 	"strings"
 )
@@ -127,4 +128,47 @@ func GetUnicastAddressFromInterface(interfaceName string) (net.IP, error) {
 	}
 
 	return ip, nil
+}
+
+// tunnelAddrs picks an interface's GTP-U addresses from its addresses: the first IPv4
+// one, and the first global IPv6 one (a tunnel is never sent from a link-local address).
+func tunnelAddrs(addrs []net.Addr) (v4, v6 netip.Addr) {
+	for _, a := range addrs {
+		prefix, err := netip.ParsePrefix(a.String())
+		if err != nil {
+			continue
+		}
+
+		ip := prefix.Addr().Unmap()
+		switch {
+		case ip.Is4():
+			if !v4.IsValid() {
+				v4 = ip
+			}
+		case ip.IsGlobalUnicast():
+			if !v6.IsValid() {
+				v6 = ip
+			}
+		}
+	}
+
+	return v4, v6
+}
+
+// tunnelAddrsFromInterface returns the GTP-U addresses of the named interface (see
+// tunnelAddrs).
+func tunnelAddrsFromInterface(interfaceName string) (v4, v6 netip.Addr, err error) {
+	iface, err := net.InterfaceByName(interfaceName)
+	if err != nil {
+		return v4, v6, err
+	}
+
+	addrs, err := iface.Addrs()
+	if err != nil {
+		return v4, v6, err
+	}
+
+	v4, v6 = tunnelAddrs(addrs)
+
+	return v4, v6, nil
 }

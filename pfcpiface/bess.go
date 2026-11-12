@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"math"
 	"net"
+	"net/netip"
 	"strconv"
 	"sync"
 	"time"
@@ -44,6 +45,12 @@ const (
 	PostUlQosFlowMeasure = "postULQosFlowMeasure"
 	// GtpuPathMonitoringMeasure: Gtpu Path Monitoring measurement module name.
 	GtpuPathMonitoringMeasure = "gtpuPathMonitoring"
+	// FarLookup6 is the table of the IPv6 peers of FARs (up4.bess): farLookup sends a
+	// FAR's packets there when its rule's gate is farGateEncap6.
+	FarLookup6 = "farLookup6"
+	// farLookup and farLookup6 gates: GtpuEncap, and farLookup6 then gtpuEncap6.
+	farGateEncap  = 1
+	farGateEncap6 = 3
 	// far-action specific values.
 	farForwardD = 0x0
 	farForwardU = 0x1
@@ -107,7 +114,14 @@ type bess struct {
 	// registrations per address, so a FAR must register once while it points at an
 	// address and unregister that same address, however many times it is updated.
 	pathMonitoringMu   sync.Mutex
-	pathMonitoringGnbs map[pathMonitoringKey]uint32
+	pathMonitoringGnbs map[pathMonitoringKey]netip.Addr
+
+	// The FARs with an entry in farLookup6, so that one that moves to an IPv4 peer or
+	// goes away has it deleted. ipv6Tunnels says the UPF has an IPv6 GTP-U address,
+	// and so the pipeline the table (SetUpfInfo).
+	far6Mu      sync.Mutex
+	far6        map[pathMonitoringKey]struct{}
+	ipv6Tunnels bool
 }
 
 // pathMonitoringKey names a FAR: FAR IDs are unique within a session, F-SEIDs on the UPF.
@@ -116,23 +130,23 @@ type pathMonitoringKey struct {
 	farID uint32
 }
 
-// movePathMonitoring records that the FAR now points at gnb (0 for none: a FAR with no
-// tunnel) and returns the address to unregister and the one to register,
-// 0 meaning nothing to send.
-func (b *bess) movePathMonitoring(key pathMonitoringKey, gnb uint32) (unregister, register uint32) {
+// movePathMonitoring records that the FAR now points at gnb (the zero Addr for none: a
+// FAR with no tunnel) and returns the address to unregister and the one to register,
+// the zero Addr meaning nothing to send.
+func (b *bess) movePathMonitoring(key pathMonitoringKey, gnb netip.Addr) (unregister, register netip.Addr) {
 	b.pathMonitoringMu.Lock()
 	defer b.pathMonitoringMu.Unlock()
 
 	old := b.pathMonitoringGnbs[key]
 	if old == gnb {
-		return 0, 0
+		return netip.Addr{}, netip.Addr{}
 	}
 
-	if gnb == 0 {
+	if !gnb.IsValid() {
 		delete(b.pathMonitoringGnbs, key)
 	} else {
 		if b.pathMonitoringGnbs == nil {
-			b.pathMonitoringGnbs = make(map[pathMonitoringKey]uint32)
+			b.pathMonitoringGnbs = make(map[pathMonitoringKey]netip.Addr)
 		}
 
 		b.pathMonitoringGnbs[key] = gnb
@@ -141,12 +155,19 @@ func (b *bess) movePathMonitoring(key pathMonitoringKey, gnb uint32) (unregister
 	return old, gnb
 }
 
-func (b *bess) sendPathMonitoring(ctx context.Context, method upfMsgType, gnb uint32) {
-	if gnb == 0 {
+func (b *bess) sendPathMonitoring(ctx context.Context, method upfMsgType, gnb netip.Addr) {
+	if isZeroAddr(gnb) {
 		return
 	}
 
-	g := &pb.GtpuPathMonitoringCommandAddDeleteArg{GnbIp: gnb}
+	g := &pb.GtpuPathMonitoringCommandAddDeleteArg{}
+	if gnb.Is4() {
+		b4 := gnb.As4()
+		g.GnbIp = binary.BigEndian.Uint32(b4[:])
+	} else {
+		b16 := gnb.As16()
+		g.GnbIp6 = b16[:]
+	}
 
 	arg, err := anypb.New(g)
 	if err != nil {
@@ -478,6 +499,9 @@ func (b *bess) SummaryGtpuLatency(uc *upfCollector, ch chan<- prometheus.Metric)
 
 	for _, post := range gtpuPathStatsResp.Statistics {
 		gnbIpString := addrFromIPv4Field(post.GnbIp).String()
+		if gnb6, ok := netip.AddrFromSlice(post.GetGnbIp6()); ok {
+			gnbIpString = gnb6.String()
+		}
 
 		ch <- prometheus.MustNewConstMetric(
 			uc.gtpupackets,
@@ -1002,6 +1026,16 @@ func (b *bess) clearState() {
 	b.pathMonitoringGnbs = nil
 	b.pathMonitoringMu.Unlock()
 
+	if b.ipv6Tunnels {
+		if err = b.processFAR6(ctx, anyExactClear, upfMsgTypeClear); err != nil {
+			logger.BessLog.Errorln("failed to clear farLookup6:", err)
+		}
+	}
+
+	b.far6Mu.Lock()
+	b.far6 = nil
+	b.far6Mu.Unlock()
+
 	clearQoSCmd := &pb.QosCommandClearArg{}
 	var anyQoSClear *anypb.Any
 	anyQoSClear, err = anypb.New(clearQoSCmd)
@@ -1038,6 +1072,9 @@ func (b *bess) SetUpfInfo(u *upf, conf *Conf) {
 	}
 
 	b.client = pb.NewBESSControlClient(b.conn)
+
+	// Before clearState, which clears farLookup6 only when the pipeline has it.
+	b.ipv6Tunnels = u.accessIP6.IsValid() || u.coreIP6.IsValid()
 
 	// Before clearState, which clears gtpuPathMonitoring only when this is set: a
 	// pfcp-agent that restarted while bessd kept running would otherwise leave the
@@ -1243,6 +1280,42 @@ func (p pdr) ipv4Match() (pdrIPv4Match, error) {
 	return m, nil
 }
 
+// tunnelMatch is a value and mask of pdrLookup's tunnel_ipv4_dst field.
+type tunnelMatch struct {
+	dst, mask uint32
+}
+
+// ipv6TunnelKey is what pdrLookup's tunnel_ipv4_dst holds for a G-PDU to an IPv6
+// address: its low-order 32 bits, which GtpuParser copies there for an IPv6 outer
+// header (Ipv6TunnelKey in gtpu_parser.h). The TEID, which the UPF allocates uniquely,
+// does the rest of the matching.
+func ipv6TunnelKey(a netip.Addr) uint32 {
+	b := a.As16()
+
+	return binary.BigEndian.Uint32(b[12:])
+}
+
+// tunnelMatches returns the tunnel_ipv4_dst matches of the PDR: one for each address of
+// its F-TEID -- the IPv4 one (m.tunnelDst), and the IPv6 one by its low 32 bits -- or, for
+// a PDR on no F-TEID address, the one m carries (any address, or the PDR's own prefix).
+func (p pdr) tunnelMatches(m pdrIPv4Match) []tunnelMatch {
+	matches := make([]tunnelMatch, 0, 2)
+	if p.tunnelIPDst.IsValid() || !p.tunnelIPv6Dst.IsValid() {
+		matches = append(matches, tunnelMatch{m.tunnelDst, m.tunnelDstMask})
+	}
+
+	if p.tunnelIPv6Dst.IsValid() {
+		key := tunnelMatch{ipv6TunnelKey(p.tunnelIPv6Dst.Addr()), ^uint32(0)}
+		// Both addresses with the same low 32 bits would be one entry, added twice
+		// and then deleted twice.
+		if len(matches) == 0 || matches[0] != key {
+			matches = append(matches, key)
+		}
+	}
+
+	return matches
+}
+
 func (b *bess) addPDR(ctx context.Context, done chan<- bool, p pdr) {
 	go func() {
 		completed := false
@@ -1275,47 +1348,49 @@ func (b *bess) addPDR(ctx context.Context, done chan<- bool, p pdr) {
 
 		logger.BessLog.Debugf("PDR rules %+v", portRules)
 
-		for _, r := range portRules {
-			f := &pb.WildcardMatchCommandAddArg{
-				Gate:     uint64(p.needDecap),
-				Priority: int64(math.MaxUint32 - p.precedence),
-				Values: []*pb.FieldData{
-					intEnc(uint64(p.srcIface)),        /* src_iface */
-					intEnc(uint64(m.tunnelDst)),       /* tunnel_ipv4_dst */
-					intEnc(uint64(p.tunnelTEID)),      /* enb_teid */
-					intEnc(uint64(m.srcIP)),           /* ueaddr ip*/
-					intEnc(uint64(m.dstIP)),           /* inet ip */
-					intEnc(uint64(r.srcPort)),         /* ue port */
-					intEnc(uint64(r.dstPort)),         /* inet port */
-					intEnc(uint64(p.appFilter.proto)), /* proto id */
-				},
-				Masks: []*pb.FieldData{
-					intEnc(uint64(p.srcIfaceMask)),        /* src_iface-mask */
-					intEnc(uint64(m.tunnelDstMask)),       /* tunnel_ipv4_dst-mask */
-					intEnc(uint64(p.tunnelTEIDMask)),      /* enb_teid-mask */
-					intEnc(uint64(m.srcIPMask)),           /* ueaddr ip-mask */
-					intEnc(uint64(m.dstIPMask)),           /* inet ip-mask */
-					intEnc(uint64(r.srcMask)),             /* ue port-mask */
-					intEnc(uint64(r.dstMask)),             /* inet port-mask */
-					intEnc(uint64(p.appFilter.protoMask)), /* proto id-mask */
-				},
-				Valuesv: []*pb.FieldData{
-					intEnc(uint64(p.pdrID)), /* pdr-id */
-					intEnc(p.fseID),         /* fseid */
-					intEnc(uint64(p.ctrID)), /* ctr_id */
-					intEnc(uint64(qerID)),   /* qer_id */
-					intEnc(uint64(p.farID)), /* far_id */
-				},
-			}
+		for _, t := range p.tunnelMatches(m) {
+			for _, r := range portRules {
+				f := &pb.WildcardMatchCommandAddArg{
+					Gate:     uint64(p.needDecap),
+					Priority: int64(math.MaxUint32 - p.precedence),
+					Values: []*pb.FieldData{
+						intEnc(uint64(p.srcIface)),        /* src_iface */
+						intEnc(uint64(t.dst)),             /* tunnel_ipv4_dst */
+						intEnc(uint64(p.tunnelTEID)),      /* enb_teid */
+						intEnc(uint64(m.srcIP)),           /* ueaddr ip*/
+						intEnc(uint64(m.dstIP)),           /* inet ip */
+						intEnc(uint64(r.srcPort)),         /* ue port */
+						intEnc(uint64(r.dstPort)),         /* inet port */
+						intEnc(uint64(p.appFilter.proto)), /* proto id */
+					},
+					Masks: []*pb.FieldData{
+						intEnc(uint64(p.srcIfaceMask)),        /* src_iface-mask */
+						intEnc(uint64(t.mask)),                /* tunnel_ipv4_dst-mask */
+						intEnc(uint64(p.tunnelTEIDMask)),      /* enb_teid-mask */
+						intEnc(uint64(m.srcIPMask)),           /* ueaddr ip-mask */
+						intEnc(uint64(m.dstIPMask)),           /* inet ip-mask */
+						intEnc(uint64(r.srcMask)),             /* ue port-mask */
+						intEnc(uint64(r.dstMask)),             /* inet port-mask */
+						intEnc(uint64(p.appFilter.protoMask)), /* proto id-mask */
+					},
+					Valuesv: []*pb.FieldData{
+						intEnc(uint64(p.pdrID)), /* pdr-id */
+						intEnc(p.fseID),         /* fseid */
+						intEnc(uint64(p.ctrID)), /* ctr_id */
+						intEnc(uint64(qerID)),   /* qer_id */
+						intEnc(uint64(p.farID)), /* far_id */
+					},
+				}
 
-			arg, err = anypb.New(f)
-			if err != nil {
-				logger.BessLog.Infoln(errMarshalRule, f, err)
-				return
-			}
+				arg, err = anypb.New(f)
+				if err != nil {
+					logger.BessLog.Infoln(errMarshalRule, f, err)
+					return
+				}
 
-			if refused(b.processPDR(ctx, arg, upfMsgTypeAdd)) {
-				return
+				if refused(b.processPDR(ctx, arg, upfMsgTypeAdd)) {
+					return
+				}
 			}
 		}
 		completed = true
@@ -1345,38 +1420,40 @@ func (b *bess) delPDR(ctx context.Context, done chan<- bool, p pdr) {
 			return
 		}
 
-		for _, r := range portRules {
-			f := &pb.WildcardMatchCommandDeleteArg{
-				Values: []*pb.FieldData{
-					intEnc(uint64(p.srcIface)),        /* src_iface */
-					intEnc(uint64(m.tunnelDst)),       /* tunnel_ipv4_dst */
-					intEnc(uint64(p.tunnelTEID)),      /* enb_teid */
-					intEnc(uint64(m.srcIP)),           /* ueaddr ip*/
-					intEnc(uint64(m.dstIP)),           /* inet ip */
-					intEnc(uint64(r.srcPort)),         /* ue port */
-					intEnc(uint64(r.dstPort)),         /* inet port */
-					intEnc(uint64(p.appFilter.proto)), /* proto id */
-				},
-				Masks: []*pb.FieldData{
-					intEnc(uint64(p.srcIfaceMask)),        /* src_iface-mask */
-					intEnc(uint64(m.tunnelDstMask)),       /* tunnel_ipv4_dst-mask */
-					intEnc(uint64(p.tunnelTEIDMask)),      /* enb_teid-mask */
-					intEnc(uint64(m.srcIPMask)),           /* ueaddr ip-mask */
-					intEnc(uint64(m.dstIPMask)),           /* inet ip-mask */
-					intEnc(uint64(r.srcMask)),             /* ue port-mask */
-					intEnc(uint64(r.dstMask)),             /* inet port-mask */
-					intEnc(uint64(p.appFilter.protoMask)), /* proto id-mask */
-				},
-			}
+		for _, t := range p.tunnelMatches(m) {
+			for _, r := range portRules {
+				f := &pb.WildcardMatchCommandDeleteArg{
+					Values: []*pb.FieldData{
+						intEnc(uint64(p.srcIface)),        /* src_iface */
+						intEnc(uint64(t.dst)),             /* tunnel_ipv4_dst */
+						intEnc(uint64(p.tunnelTEID)),      /* enb_teid */
+						intEnc(uint64(m.srcIP)),           /* ueaddr ip*/
+						intEnc(uint64(m.dstIP)),           /* inet ip */
+						intEnc(uint64(r.srcPort)),         /* ue port */
+						intEnc(uint64(r.dstPort)),         /* inet port */
+						intEnc(uint64(p.appFilter.proto)), /* proto id */
+					},
+					Masks: []*pb.FieldData{
+						intEnc(uint64(p.srcIfaceMask)),        /* src_iface-mask */
+						intEnc(uint64(t.mask)),                /* tunnel_ipv4_dst-mask */
+						intEnc(uint64(p.tunnelTEIDMask)),      /* enb_teid-mask */
+						intEnc(uint64(m.srcIPMask)),           /* ueaddr ip-mask */
+						intEnc(uint64(m.dstIPMask)),           /* inet ip-mask */
+						intEnc(uint64(r.srcMask)),             /* ue port-mask */
+						intEnc(uint64(r.dstMask)),             /* inet port-mask */
+						intEnc(uint64(p.appFilter.protoMask)), /* proto id-mask */
+					},
+				}
 
-			arg, err = anypb.New(f)
-			if err != nil {
-				logger.BessLog.Errorln(errMarshalRule, f, err)
-				return
-			}
+				arg, err = anypb.New(f)
+				if err != nil {
+					logger.BessLog.Errorln(errMarshalRule, f, err)
+					return
+				}
 
-			if refused(b.processPDR(ctx, arg, upfMsgTypeDel)) {
-				return
+				if refused(b.processPDR(ctx, arg, upfMsgTypeDel)) {
+					return
+				}
 			}
 		}
 		completed = true
@@ -1587,6 +1664,15 @@ func (b *bess) delApplicationQER(
 // processFAR programs one FAR into the datapath's forwarding table and reports whether
 // the datapath took it. See processPDR for why the return value matters.
 func (b *bess) processFAR(ctx context.Context, arg *anypb.Any, method upfMsgType) error {
+	return b.processFARTable(ctx, "farLookup", arg, method)
+}
+
+// processFAR6 programs farLookup6, the IPv6 peers of FARs; see processFAR.
+func (b *bess) processFAR6(ctx context.Context, arg *anypb.Any, method upfMsgType) error {
+	return b.processFARTable(ctx, FarLookup6, arg, method)
+}
+
+func (b *bess) processFARTable(ctx context.Context, module string, arg *anypb.Any, method upfMsgType) error {
 	if method != upfMsgTypeAdd && method != upfMsgTypeDel && method != upfMsgTypeClear {
 		return ErrInvalidArgument("method name", method)
 	}
@@ -1594,14 +1680,91 @@ func (b *bess) processFAR(ctx context.Context, arg *anypb.Any, method upfMsgType
 	methods := [...]string{upfMethodAdd, upfMethodAdd, upfMethodDelete, upfMethodClear}
 
 	resp, err := b.client.ModuleCommand(ctx, &pb.CommandRequest{
-		Name: "farLookup",
+		Name: module,
 		Cmd:  methods[method],
 		Arg:  arg,
 	})
 
-	logger.BessLog.Debugf("farlookup resp: %v", resp)
+	logger.BessLog.Debugf("%s resp: %v", module, resp)
 
-	return commandOutcome("farLookup", method, methods[method], resp, err)
+	return commandOutcome(module, method, methods[method], resp, err)
+}
+
+// ipv6Halves is an IPv6 address as farLookup6 holds it: two 64-bit values, which
+// GtpuEncap writes back big-endian.
+func ipv6Halves(a netip.Addr) (hi, lo uint64) {
+	b := a.As16()
+
+	return binary.BigEndian.Uint64(b[:8]), binary.BigEndian.Uint64(b[8:])
+}
+
+// farKey is the farLookup and farLookup6 key of a FAR.
+func farKey(far far) []*pb.FieldData {
+	return []*pb.FieldData{
+		intEnc(uint64(far.farID)), /* far_id */
+		intEnc(far.fseID),         /* fseid */
+	}
+}
+
+// addFAR6 writes the FAR's IPv6 peer to farLookup6.
+func (b *bess) addFAR6(ctx context.Context, far far) error {
+	hi, lo := ipv6Halves(far.tunnelIPDst)
+	f := &pb.ExactMatchCommandAddArg{
+		Gate:   farGateEncap,
+		Fields: farKey(far),
+		Values: []*pb.FieldData{
+			intEnc(hi), /* tunnel_out_dst_ip6_hi */
+			intEnc(lo), /* tunnel_out_dst_ip6_lo */
+		},
+	}
+
+	arg, err := anypb.New(f)
+	if err != nil {
+		return err
+	}
+
+	if err = b.processFAR6(ctx, arg, upfMsgTypeAdd); err != nil {
+		return err
+	}
+
+	b.far6Mu.Lock()
+	defer b.far6Mu.Unlock()
+
+	if b.far6 == nil {
+		b.far6 = make(map[pathMonitoringKey]struct{})
+	}
+
+	b.far6[pathMonitoringKey{far.fseID, far.farID}] = struct{}{}
+
+	return nil
+}
+
+// delFAR6 deletes the FAR's farLookup6 entry, if it has one (or, force, in any case).
+func (b *bess) delFAR6(ctx context.Context, far far, force bool) error {
+	key := pathMonitoringKey{far.fseID, far.farID}
+
+	b.far6Mu.Lock()
+	_, has := b.far6[key]
+	b.far6Mu.Unlock()
+
+	if !has && !force {
+		return nil
+	}
+
+	arg, err := anypb.New(&pb.ExactMatchCommandDeleteArg{Fields: farKey(far)})
+	if err != nil {
+		return err
+	}
+
+	if err = b.processFAR6(ctx, arg, upfMsgTypeDel); err != nil {
+		return err
+	}
+
+	b.far6Mu.Lock()
+	delete(b.far6, key)
+	b.far6Mu.Unlock()
+
+	return nil
 }
 
 func (b *bess) processGtpuPathMonitoring(ctx context.Context, arg *anypb.Any, method upfMsgType) {
@@ -1669,15 +1832,30 @@ func (b *bess) addFAR(ctx context.Context, done chan<- bool, far far) {
 			err error
 		)
 
-		tunnelSrc, tunnelDst, err := far.ipv4Tunnel()
-		if err != nil {
+		// A tunnel to an IPv6 peer: the peer goes to farLookup6 first, so that it is
+		// there when farLookup sends the FAR's packets on; farLookup keeps zeros for the
+		// IPv4 endpoints.
+		tunnel6 := far.tunnelType == farGateEncap && far.tunnelIPDst.Is6()
+
+		var tunnelSrc, tunnelDst uint32
+
+		gate := uint64(far.tunnelType)
+
+		if tunnel6 {
+			if err = b.addFAR6(ctx, far); err != nil {
+				logger.BessLog.Errorln("FAR", far.farID, "IPv6 peer:", err)
+				return
+			}
+
+			gate = farGateEncap6
+		} else if tunnelSrc, tunnelDst, err = far.ipv4Tunnel(); err != nil {
 			logger.BessLog.Errorln(err)
 			return
 		}
 
 		action := b.setActionValue(far)
 		f := &pb.ExactMatchCommandAddArg{
-			Gate: uint64(far.tunnelType),
+			Gate: gate,
 			Fields: []*pb.FieldData{
 				intEnc(uint64(far.farID)), /* far_id */
 				intEnc(far.fseID),         /* fseid */
@@ -1702,14 +1880,28 @@ func (b *bess) addFAR(ctx context.Context, done chan<- bool, far far) {
 			return
 		}
 
+		// A FAR that moved off an IPv6 peer leaves an entry nothing reaches any more.
+		if !tunnel6 {
+			if err = b.delFAR6(ctx, far, false); err != nil {
+				logger.BessLog.Errorln("FAR", far.farID, "previous IPv6 peer:", err)
+			}
+		}
+
 		if enableGtpuPathMonitoring {
 			// A modification reaches here too, with the FAR's new version, so the
 			// registration moves with the FAR rather than being added again.
 			// Path monitoring is not a forwarding rule: a session is programmed
 			// whether or not monitoring was set up for its gNB, so its result does
 			// not decide the batch.
+			var gnb netip.Addr
+			if tunnel6 {
+				gnb = far.tunnelIPDst
+			} else if tunnelDst != 0 {
+				gnb = addrFromIPv4Field(tunnelDst)
+			}
+
 			unregister, register := b.movePathMonitoring(
-				pathMonitoringKey{far.fseID, far.farID}, tunnelDst)
+				pathMonitoringKey{far.fseID, far.farID}, gnb)
 			b.sendPathMonitoring(ctx, upfMsgTypeDel, unregister)
 			b.sendPathMonitoring(ctx, upfMsgTypeAdd, register)
 		}
@@ -1729,10 +1921,7 @@ func (b *bess) delFAR(ctx context.Context, done chan<- bool, far far) {
 		)
 
 		f := &pb.ExactMatchCommandDeleteArg{
-			Fields: []*pb.FieldData{
-				intEnc(uint64(far.farID)), /* far_id */
-				intEnc(far.fseID),         /* fseid */
-			},
+			Fields: farKey(far),
 		}
 
 		arg, err = anypb.New(f)
@@ -1745,18 +1934,22 @@ func (b *bess) delFAR(ctx context.Context, done chan<- bool, far far) {
 			return
 		}
 
+		// After farLookup, which no longer sends the FAR's packets to farLookup6. A
+		// `simulate delete` process has no record of what it is to delete (see below).
+		force := simulate.delete() && far.tunnelType == farGateEncap && far.tunnelIPDst.Is6()
+		if err = b.delFAR6(ctx, far, force); err != nil {
+			logger.BessLog.Errorln("FAR", far.farID, "IPv6 peer:", err)
+		}
+
 		// Reached only once the datapath has removed the FAR: a refused delete keeps the
 		// record, so a retried delete unregisters the gNB exactly once.
 		if enableGtpuPathMonitoring {
-			unregister, _ := b.movePathMonitoring(pathMonitoringKey{far.fseID, far.farID}, 0)
-			if unregister == 0 && simulate.delete() {
+			unregister, _ := b.movePathMonitoring(pathMonitoringKey{far.fseID, far.farID}, netip.Addr{})
+			if !unregister.IsValid() && simulate.delete() {
 				// A `simulate delete` process keeps what a `simulate create` process
 				// programmed, but not its record, so it unregisters the FAR's own
 				// address. One run deletes each session once.
-				// A FAR the datapath took has an IPv4 tunnel, or none.
-				if _, tunnelDst, err := far.ipv4Tunnel(); err == nil {
-					unregister = tunnelDst
-				}
+				unregister = far.tunnelIPDst
 			}
 
 			b.sendPathMonitoring(ctx, upfMsgTypeDel, unregister)

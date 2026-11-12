@@ -40,10 +40,11 @@ type far struct {
 	sendEndMarker bool
 	applyAction   uint8
 	tunnelType    uint8
-	tunnelIPSrc   netip.Addr
+	// tunnelIPSrc is the UPF's address the tunnel is sent from, of tunnelIPDst's family.
+	tunnelIPSrc netip.Addr
 	// tunnelIPDst is the peer the FAR's Outer Header Creation sends to. When the IE
 	// carries both an IPv4 and an IPv6 address the UP function picks one (TS 29.244 clause
-	// 8.2.56); this one picks IPv4, the family the datapath forwards.
+	// 8.2.56); this one picks IPv4, unless N3 is restricted to IPv6 (see ohcPeer).
 	tunnelIPDst netip.Addr
 	tunnelTEID  uint32
 	tunnelPort  uint16
@@ -82,6 +83,8 @@ func (f *far) parseFAR(farIE *ie.IE, fseid uint64, upf *upf, op operation) error
 	var fields Bits
 	var ohcFields *ie.OuterHeaderCreationFields
 
+	var ohcV4, ohcV6 netip.Addr
+
 	for _, fwdIE := range fwdIEs {
 		switch fwdIE.Type {
 		case ie.OuterHeaderCreation:
@@ -94,10 +97,8 @@ func (f *far) parseFAR(farIE *ie.IE, fseid uint64, upf *upf, op operation) error
 			}
 
 			f.tunnelTEID = ohcFields.TEID
-			f.tunnelIPDst = addrFromIP(ohcFields.IPv4Address)
-			if !f.tunnelIPDst.IsValid() {
-				f.tunnelIPDst = addrFromIP(ohcFields.IPv6Address)
-			}
+			ohcV4 = addrFromIP(ohcFields.IPv4Address)
+			ohcV6 = addrFromIP(ohcFields.IPv6Address)
 
 			f.tunnelType = uint8(1) // Preserve the existing tunnel type encoding for GTP-U forwarding.
 			f.tunnelPort = tunnelGTPUPort
@@ -131,14 +132,37 @@ func (f *far) parseFAR(farIE *ie.IE, fseid uint64, upf *upf, op operation) error
 		}
 	}
 
+	if ohcV4.IsValid() || ohcV6.IsValid() {
+		f.tunnelIPDst = ohcPeer(ohcV4, ohcV6, upf.n3Family)
+		if f.tunnelIPDst.Is6() {
+			// The IPv6 source is the interface's; the datapath sends from it whatever
+			// the FAR says (GtpuEncap's access_ip6/core_ip6), and the FAR keeps it for
+			// the end marker it may send.
+			f.tunnelIPSrc = upf.tunnelIP6Src(f.dstIntf)
+		}
+	}
+
 	return f.checkDatapathSupport()
 }
 
-// checkDatapathSupport refuses a FAR whose tunnel the datapath cannot build: it
-// encapsulates in IPv4 only. See pdr.checkDatapathSupport for why here.
+// ohcPeer picks the peer of an Outer Header Creation: the address it gives, or, when it
+// gives both, IPv4 -- which the UPF sent to before it had IPv6 N3 -- unless N3 is
+// restricted to IPv6.
+func ohcPeer(v4, v6 netip.Addr, n3Family string) netip.Addr {
+	if !v4.IsValid() || (v6.IsValid() && n3Family == transportFamilyIPv6) {
+		return v6
+	}
+
+	return v4
+}
+
+// checkDatapathSupport refuses a FAR whose tunnel the datapath cannot build: one to an
+// IPv6 peer through an interface with no IPv6 address to send from. See
+// pdr.checkDatapathSupport for why here.
 func (f far) checkDatapathSupport() error {
-	if f.tunnelIPDst.IsValid() && !f.tunnelIPDst.Is4() {
-		return ErrUnsupported("FAR creating an IPv6 outer header to", f.tunnelIPDst)
+	if f.tunnelIPDst.Is6() && !f.tunnelIPSrc.IsValid() {
+		return ErrUnsupported("FAR creating an IPv6 outer header (no IPv6 address on the interface) to",
+			f.tunnelIPDst)
 	}
 
 	return nil

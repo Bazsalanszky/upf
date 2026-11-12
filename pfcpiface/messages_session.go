@@ -191,8 +191,9 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 
 			p.tunnelTEID = fteid
 			p.tunnelTEIDMask = 0xFFFFFFFF
-			// TODO(ipv6-p2): the chosen F-TEID is the IPv4 N3 address only (no CHV6).
-			p.tunnelIPDst = hostPrefix(addrFromIP(upf.accessIP))
+			if err = p.chooseFTEIDAddrs(upf.n3Addrs()); err != nil {
+				return errProcessReply(err, ie.CauseRequestRejected)
+			}
 		}
 
 		p.fseidIP = fseidIP
