@@ -380,12 +380,31 @@ func (p pdr) occupiesSameEntryAs(other pdr) bool {
 }
 
 func (p pdr) String() string {
-	return fmt.Sprintf("PDR(id=%v, F-SEID=%v, srcIface=%v, tunnelIPDst=%v, "+
+	s := fmt.Sprintf("PDR(id=%v, F-SEID=%v, srcIface=%v, tunnelIPDst=%v, "+
 		"tunnelTEID=%v/%x, ueAddress=%v, applicationFilter=%v, precedence=%v, F-SEID IP=%v, "+
-		"counterID=%v, farID=%v, qerIDs=%v, needDecap=%v, allocIPFlag=%v)",
+		"counterID=%v, farID=%v, qerIDs=%v, needDecap=%v, allocIPFlag=%v",
 		p.pdrID, p.fseID, p.srcIface, p.tunnelIPDst,
 		p.tunnelTEID, p.tunnelTEIDMask, p.ueAddress, p.appFilter, p.precedence,
 		p.fseidIP, p.ctrID, p.farID, p.qerIDList, p.needDecap, p.allocIPFlag)
+
+	// The IPv6 parts, which are not installed, only when there are any.
+	if p.tunnelIPv6Dst.IsValid() {
+		s += fmt.Sprintf(", tunnelIPv6Dst=%v", p.tunnelIPv6Dst)
+	}
+
+	if p.ueIPv6.IsValid() {
+		s += fmt.Sprintf(", ueIPv6=%v", p.ueIPv6)
+	}
+
+	if p.noIPv4Rule {
+		s += ", noIPv4Rule"
+	}
+
+	if p.hasIPv6Rule {
+		s += fmt.Sprintf(", applicationFilter6=%v", p.appFilter6)
+	}
+
+	return s + ")"
 }
 
 func (p pdr) IsAppFilterEmpty() bool {
