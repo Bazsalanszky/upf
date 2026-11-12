@@ -112,31 +112,36 @@ class GtpuIpv6Test(BessModuleTestCase):
         out = self.parse([n3v6(gtpu(0x30, 0xFF, INNER_UDP), dst=other)])
         self.assertEqual(out[0][16:20], ip4("10.10.3.1"))
 
-    def test_parser_leaves_other_ipv6_packets_unclassified(self):
-        cases = {
+    def test_parser_classifies_no_other_ipv6_packet_as_ipv4(self):
+        # Gate 1 is pdrLookup, for IPv4 UE packets. An IPv6 packet that is not a G-PDU
+        # with an IPv4 packet inside goes to gate 2 (pdrLookup6, gtpu_ue_ipv6.py) when
+        # it is a whole IPv6 packet, and to gate 0 when it is cut or carries no packet.
+        to_pdr_lookup6 = {
             "neighbour_solicitation": bytes(
                 ETH / scapy.IPv6(src="fe80::1", dst="ff02::1:ff00:1") / scapy.ICMPv6ND_NS(tgt=N3_6)
             ),
             "udp_other_port": bytes(ETH / scapy.IPv6(src=GNB_6, dst=N3_6) / scapy.UDP(sport=5000, dport=53) / b"q"),
-            # An extension header before UDP: not classified, not decapsulated.
+            # An extension header before UDP: classified on its own, not decapsulated.
             "hop_by_hop": bytes(
                 ETH / scapy.IPv6(src=GNB_6, dst=N3_6) / scapy.IPv6ExtHdrHopByHop()
                 / scapy.UDP(sport=2152, dport=2152) / scapy.Raw(gtpu(0x30, 0xFF, INNER_UDP))
             ),
             "ipv6_ue_packet": bytes(ETH / scapy.IPv6(src="2001:db8:500::1", dst="2001:db8::9") / scapy.UDP()),
+            "inner_ipv6": n3v6(gtpu(0x30, 0xFF, bytes(scapy.IPv6(src="fd00::1", dst="fd00::2") / scapy.UDP()))),
+        }
+        to_default = {
             "outer_ipv6_cut": GPDU6_UDP[: ETH_LEN + 30],
             "udp_cut": GPDU6_UDP[: ETH_LEN + 40 + 4],
             "end_marker": n3v6(gtpu(0x30, 254, b"")),
-            # Inner IPv6 is stage 3 of the port: still not classified.
-            "inner_ipv6": n3v6(gtpu(0x30, 0xFF, bytes(scapy.IPv6(src="fd00::1", dst="fd00::2") / scapy.UDP()))),
         }
-        for name, pkt in cases.items():
-            with self.subTest(case=name):
-                parser = GtpuParser()
-                out = self.run_module(parser, 0, [pkt], [0, 1])
-                self.assertEqual(len(out[1]), 0, f"{name} was classified")
-                self.assertEqual(len(out[0]), 1)
-                self.assertBessAlive()
+        for gate, cases in ((2, to_pdr_lookup6), (0, to_default)):
+            for name, pkt in cases.items():
+                with self.subTest(case=name):
+                    parser = GtpuParser()
+                    out = self.run_module(parser, 0, [pkt], [0, 1, 2])
+                    self.assertEqual(len(out[1]), 0, f"{name} was classified as IPv4")
+                    self.assertEqual(len(out[gate]), 1, f"{name} did not leave on gate {gate}")
+                    self.assertBessAlive()
 
     # ---------------------------------------------------------------- decap
     def test_decap_strips_an_ipv6_outer_header_and_fixes_the_ethertype(self):
@@ -165,15 +170,10 @@ class GtpuIpv6Test(BessModuleTestCase):
                 self.assertBessAlive()
 
     # ---------------------------------------------------------------- encap
-    def encap(self, pkts, attrs, add_psc=True, igate=None, **kwargs):
-        """Runs GtpuEncap on input gate 1 (IPv6 peer) when the attributes
-        name an IPv6 peer, gate 0 (IPv4 peer) otherwise, as farLookup and
-        farLookup6 feed it in up4.bess."""
-        if igate is None:
-            igate = 1 if any(a["name"].startswith("tunnel_out_dst_ip6") and a["value_int"] for a in attrs) else 0
+    def encap(self, pkts, attrs, add_psc=True, **kwargs):
         tunnel = SetMetadata(attrs=attrs)
         encap = GtpuEncap(add_psc=add_psc, **kwargs)
-        self.bess.connect_modules(tunnel.name, encap.name, 0, igate)
+        self.bess.connect_modules(tunnel.name, encap.name, 0, 0)
         return self.run_pipeline(tunnel, encap, 0, pkts, [0, 1], proto=bytes)
 
     def test_encap_builds_an_ipv6_outer_header_for_an_ipv6_peer(self):
@@ -214,22 +214,19 @@ class GtpuIpv6Test(BessModuleTestCase):
         self.assertEqual(len(out[1]), 0)
         self.assertEqual(len(out[0]), 1, "the packet did not leave by the failure gate")
 
-    def test_encap_without_any_ipv6_source_fails_the_ipv6_gate(self):
-        out = self.encap([bytes(ETH4) + INNER_UDP], tunnel_attrs(dst4="10.200.0.201")[:6], igate=1)
-        self.assertEqual(len(out[1]), 0)
-        self.assertEqual(len(out[0]), 1, "the packet did not leave by the failure gate")
-
-    def test_encap_to_an_ipv4_peer_is_unchanged_by_the_ipv6_source(self):
-        # The same IPv4 tunnel with and without the module's IPv6 addresses:
-        # byte for byte the same, apart from the IPv4 ID, which counts up.
-        # On gate 0 the IPv6 attributes are not read, whatever they hold.
+    def test_encap_without_an_ipv6_source_is_the_ipv4_encapsulator(self):
+        # An instance without IPv6 sources -- the pipeline's gtpuEncap --
+        # ignores IPv6 tunnel attributes, whatever they hold, and builds the
+        # IPv4 outer header it always has.
         downlink = bytes(ETH4) + INNER_UDP
         plain = self.encap([downlink], tunnel_attrs(dst4="10.200.0.201")[:6])[1][0]
-        dual = self.encap([downlink], tunnel_attrs(dst4="10.200.0.201", dst6=GNB_6), igate=0,
-                          access_ip6=N3_6, core_ip6=CORE_6)[1][0]
+        with_v6_attrs = self.encap([downlink], tunnel_attrs(dst4="10.200.0.201", dst6=GNB_6))[1][0]
         ip_id = slice(ETH_LEN + 4, ETH_LEN + 6)
-        self.assertEqual(plain[: ip_id.start] + plain[ip_id.stop :], dual[: ip_id.start] + dual[ip_id.stop :])
+        self.assertEqual(
+            plain[: ip_id.start] + plain[ip_id.stop :], with_v6_attrs[: ip_id.start] + with_v6_attrs[ip_id.stop :]
+        )
         self.assertEqual(plain[12:14], b"\x08\x00")
+        self.assertEqual(scapy.IP(plain[ETH_LEN:]).dst, "10.200.0.201")
 
     def test_encap_refuses_an_invalid_ipv6_source(self):
         with self.assertRaises(bess.Error):

@@ -167,6 +167,9 @@ access_rx_l4_verify = ports[parser.access_ifname].mode == 'dpdk'
 #   - teid (fseid)
 #   - tunnel_ip4_dst
 #   - proto_id
+# and, for an IPv6 UE packet (gate 2, pdrLookup6):
+#   - src_ip6_hi, src_ip6_lo, dst_ip6_hi, dst_ip6_lo
+#   - l4_ports
 
 # pdrLookup keeps a rule that matches the UE address exactly -- src_ip on access,
 # dst_ip on core, as pfcpiface writes it when the SDF filter names the UE as
@@ -194,6 +197,30 @@ linkMerge::Merge() \
                                 index_sets=[{'fields': [0, 3], 'when_field': 0, 'when_value': Access}, \
                                             {'fields': [0, 4], 'when_field': 0, 'when_value': Core}]):noGTPUDecap
 
+# pdrLookup6 is pdrLookup for IPv6 UE packets (GtpuParser gate 2): an IPv6
+# packet in a G-PDU from the RAN, or one from the data network. WildcardMatch
+# takes at most eight fields of at most eight bytes each, so the IPv6 addresses
+# are two 8-byte halves each, and both ports share one 4-byte field (source port
+# then destination port). It has no tunnel destination: the TEID, which the UPF
+# allocates uniquely, identifies the tunnel. Its values are pdrLookup's, so the
+# rest of the pipeline (QER, FAR, encapsulation) is the same for both families.
+pdrLookup6::WildcardMatch(fields=[{'attr_name':'src_iface', 'num_bytes':1}, \
+                                  {'attr_name':'teid', 'num_bytes':4}, \
+                                  {'attr_name':'src_ip6_hi', 'num_bytes':8}, \
+                                  {'attr_name':'src_ip6_lo', 'num_bytes':8}, \
+                                  {'attr_name':'dst_ip6_hi', 'num_bytes':8}, \
+                                  {'attr_name':'dst_ip6_lo', 'num_bytes':8}, \
+                                  {'attr_name':'l4_ports', 'num_bytes':4}, \
+                                  {'attr_name':'ip_proto', 'num_bytes':1}], \
+                          values=[{'attr_name':'pdr_id', 'num_bytes':4}, \
+                                  {'attr_name':'fseid', 'num_bytes':8}, \
+                                  {'attr_name':'ctr_id', 'num_bytes':4}, \
+                                  {'attr_name':'qer_id', 'num_bytes':4}, \
+                                  {'attr_name':'far_id', 'num_bytes':4}], \
+                          entries=parser.table_size_pdr_lookup, \
+                          max_tuples=parser.pdr_lookup_max_masks)
+pktParse:2 -> pdrLookup6
+
 appQERLookup::Qos(fields=[{'attr_name':'src_iface', 'num_bytes':1}, \
                                  {'attr_name':'qer_id', 'num_bytes':4}, \
                                  {'attr_name':'fseid', 'num_bytes':8}], \
@@ -209,11 +236,14 @@ if parser.measure_flow:
     pdrLookup:GTPUDecap \
         -> gtpuDecap::GtpuDecap() \
         -> preQosFlowMeasure
+    pdrLookup6 -> preQosFlowMeasure
 else:
     pdrLookup -> appQERLookup
     pdrLookup:GTPUDecap \
         -> gtpuDecap::GtpuDecap() \
         -> appQERLookup
+    pdrLookup6 -> appQERLookup
+pdrLookup6:GTPUDecap -> gtpuDecap
 
 executeFAR::Split(size=1, attribute='action')
 _in = executeFAR
@@ -266,28 +296,36 @@ sessionQERLookup.set_default_gate(gate=qerFailGate)
 
 # Add logical pipeline when gtpuencap is needed
 farLookup:GTPUEncap \
-    -> gtpuEncap::GtpuEncap(add_psc=parser.gtppsc,
-                            access_ip6=access_ip6 or '',
-                            core_ip6=core_ip6 or ''):1 \
+    -> gtpuEncap::GtpuEncap(add_psc=parser.gtppsc):1 \
     -> outerL4Cksum::L4Checksum() \
     -> outerIPCksum::IPChecksum() \
     -> farMerge
 
 # A FAR whose tunnel peer is IPv6 keeps the peer in farLookup6, under the
-# same key, and farLookup sends its packets there (gate GTPUEncap6). They
-# reach gtpuEncap on input gate 1, which builds an IPv6 outer header; an
-# IPv4 peer stays in farLookup's six values and comes in on gate 0. pfcpiface
-# programs farLookup6 only when it hands out IPv6 F-TEIDs, so an IPv4-only
-# UPF leaves it empty.
+# same key, and farLookup sends its packets there (gate GTPUEncap6), on to
+# gtpuEncap6, which builds IPv6 outer headers from the UPF's IPv6 addresses.
+# A tunnel to an IPv4 peer stays in farLookup's six values and gtpuEncap,
+# unchanged. gtpuEncap6 is a separate instance because BESS gives an
+# attribute's reader an offset only if every path to it has a writer, and
+# farLookup does not write the IPv6 peer. pfcpiface programs farLookup6
+# only when it hands out IPv6 F-TEIDs, so an IPv4-only UPF leaves it empty.
 farLookup6::ExactMatch(fields=[{'attr_name':'far_id', 'num_bytes':4}, \
                                {'attr_name':'fseid', 'num_bytes':8}], \
                        values=[{'attr_name':'tunnel_out_dst_ip6_hi', 'num_bytes':8}, \
                                {'attr_name':'tunnel_out_dst_ip6_lo', 'num_bytes':8}],\
                        entries=parser.table_size_far_lookup)
 farLookup:GTPUEncap6 -> farLookup6
-farLookup6:GTPUEncap -> 1:gtpuEncap
 farLookup6:farFailGate -> farLookup6Fail::Sink()
 farLookup6.set_default_gate(gate=farFailGate)
+if access_ip6 or core_ip6:
+    farLookup6:GTPUEncap \
+        -> gtpuEncap6::GtpuEncap(add_psc=parser.gtppsc,
+                                 access_ip6=access_ip6 or '',
+                                 core_ip6=core_ip6 or ''):1 \
+        -> outerL4Cksum
+    gtpuEncap6:0 -> gtpuEncap6Fail::Sink()
+else:
+    farLookup6:GTPUEncap -> gtpuEncap6Fail::Sink()
 
 notify = UnixSocketPort(name='notifyCP', path=parser.notify_sockaddr)
 pfcpPort = UnixSocketPort(name='pfcpPort', path=parser.endmarker_sockaddr)
@@ -302,6 +340,7 @@ appQERLookup:qerRedGate -> appQERMeterRed::Sink()
 appQERLookup:qerStatusDropGate -> appQERStatusDrop::Sink()
 appQERLookup:qerUnmeteredGate -> sessionQERLookup
 pdrLookup:pdrFailGate -> pdrLookupFail::Sink()
+pdrLookup6:pdrFailGate -> pdrLookup6Fail::Sink()
 farLookup:farFailGate -> farLookupFail::Sink()
 appQERLookup:qerFailGate -> appQERLookupFail::Sink()
 executeFAR:farDropAction -> farDrop::Sink()
@@ -310,6 +349,7 @@ gtpuEncap:0 -> gtpuEncapFail::Sink()
 
 # Set default gates for relevant modules
 pdrLookup.set_default_gate(gate=pdrFailGate)
+pdrLookup6.set_default_gate(gate=pdrFailGate)
 farLookup.set_default_gate(gate=farFailGate)
 appQERLookup.set_default_gate(gate=qerFailGate)
 

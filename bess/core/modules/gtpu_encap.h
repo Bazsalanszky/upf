@@ -15,11 +15,8 @@ class GtpuEncap final : public Module {
  public:
   GtpuEncap() { max_allowed_workers_ = Worker::kMaxWorkers; }
 
-  /* Output gates: (0) Default, (1) Forward */
+  /* Gates: (0) Default, (1) Forward */
   static const gate_idx_t kNumOGates = 2;
-  /* Input gates: (0) tunnel to an IPv4 peer, (1) tunnel to an IPv6 peer */
-  static const gate_idx_t kNumIGates = 2;
-  static const gate_idx_t kIpv6Gate = 1;
 
   void ProcessBatch(Context *ctx, bess::PacketBatch *batch) override;
   CommandResponse Init(const bess::pb::GtpuEncapArg &arg);
@@ -43,6 +40,9 @@ class GtpuEncap final : public Module {
   };
   Ipv6Source access_ip6_;
   Ipv6Source core_ip6_;
+  /* With an IPv6 source, this instance builds IPv6 outer headers, to the
+   * peer in the tunnel_out_dst_ip6 attributes; without, IPv4 ones. */
+  bool outer6_ = false;
   bool FillIpv6(bess::utils::Ipv6 *ip6h, uint8_t action, uint64_t dst_hi,
                 uint64_t dst_lo, uint8_t traffic_class,
                 uint16_t payload_len) const;
