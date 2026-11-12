@@ -159,13 +159,7 @@ void GtpuEncap::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
    * apart instead of in every pair of packets. Reserve a run of IDs for
    * this batch and give each packet the next one. */
   uint16_t ip_id = next_ip_id.fetch_add(cnt, std::memory_order_relaxed);
-
-  /* Gate 1 is only usable with an IPv6 source (see Init()) */
-  const bool outer6 = ctx->current_igate == kIpv6Gate;
-  if (outer6 && tout_dip6_hi_attr < 0) {
-    RunChooseModule(ctx, 0, batch);
-    return;
-  }
+  const bool outer6 = outer6_;
 
   for (int i = 0; i < cnt; i++) {
     bess::Packet *p = batch->pkts()[i];
@@ -195,9 +189,9 @@ void GtpuEncap::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
     off = attr_offset(tout_uport);
     at_tout_uport = get_attr_with_offset<uint16_t>(off, p);
 
-    /* A tunnel to an IPv6 peer comes in on input gate 1 with the peer in
-     * the tunnel_out_dst_ip6 attributes (farLookup6 in up4.bess); one to an
-     * IPv4 peer comes in on gate 0, where those attributes are not set. */
+    /* The IPv6 peer, which an instance with IPv6 sources is fed from
+     * farLookup6 (up4.bess). An IPv4 instance reads no such attribute: BESS
+     * gives a reader an offset only when every path to it has a writer. */
     uint64_t at_tout_dip6_hi = 0;
     uint64_t at_tout_dip6_lo = 0;
     if (outer6) {
@@ -352,9 +346,10 @@ CommandResponse GtpuEncap::Init(const bess::pb::GtpuEncapArg &arg) {
   qfi_attr = AddMetadataAttr("qfi", sizeof(uint8_t), AccessMode::kRead);
   DLOG(INFO) << "qfi_attr: " << qfi_attr;
 
-  /* The IPv6 peer is read only when this UPF has an IPv6 address to send
-   * from, so an IPv4-only pipeline needs no module that writes it. */
-  if (access_ip6_.set || core_ip6_.set) {
+  /* An instance with an IPv6 source encapsulates in IPv6 and reads the
+   * IPv6 peer; one without is the IPv4 encapsulator it has always been. */
+  outer6_ = access_ip6_.set || core_ip6_.set;
+  if (outer6_) {
     tout_dip6_hi_attr = AddMetadataAttr("tunnel_out_dst_ip6_hi",
                                         sizeof(uint64_t), AccessMode::kRead);
     tout_dip6_lo_attr = AddMetadataAttr("tunnel_out_dst_ip6_lo",
