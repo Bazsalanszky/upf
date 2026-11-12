@@ -4,6 +4,8 @@
 package pfcpiface
 
 import (
+	"net"
+
 	"github.com/omec-project/upf-epc/logger"
 	"github.com/wmnsk/go-pfcp/ie"
 	"github.com/wmnsk/go-pfcp/message"
@@ -19,8 +21,7 @@ func addPdrInfo(msg *message.SessionEstablishmentResponse, pdrs []pdr) {
 			msg.CreatedPDR = append(msg.CreatedPDR,
 				ie.NewCreatedPDR(
 					ie.NewPDRID(uint16(pdr.pdrID)),
-					// TODO(ipv6-p2): an IPv6 N3 F-TEID (V6) once the rules carry one.
-					ie.NewFTEID(0x01, pdr.tunnelTEID, ipFromAddr(pdr.tunnelIPDst.Addr()), nil, 0),
+					createdFTEID(pdr),
 				))
 		}
 		if pdr.allocIPFlag && (pdr.srcIface == core) {
@@ -35,6 +36,26 @@ func addPdrInfo(msg *message.SessionEstablishmentResponse, pdrs []pdr) {
 				))
 		}
 	}
+}
+
+// createdFTEID is the F-TEID the UP function chose for pdr, with the address of each
+// family it chose: V4 (0x01), V6 (0x02) or both (TS 29.244 clause 8.2.3).
+func createdFTEID(pdr pdr) *ie.IE {
+	var flags uint8
+
+	var v4, v6 net.IP
+
+	if pdr.tunnelIPDst.IsValid() {
+		flags |= 0x01
+		v4 = ipFromAddr(pdr.tunnelIPDst.Addr())
+	}
+
+	if pdr.tunnelIPv6Dst.IsValid() {
+		flags |= 0x02
+		v6 = ipFromAddr(pdr.tunnelIPv6Dst.Addr())
+	}
+
+	return ie.NewFTEID(flags, pdr.tunnelTEID, v4, v6, 0)
 }
 
 // CreatePDR appends pdr to existing list of PDRs in the session.

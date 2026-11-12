@@ -6,11 +6,13 @@ package pfcpiface
 import (
 	"context"
 	"net"
+	"net/netip"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/omec-project/upf-epc/logger"
+	"github.com/wmnsk/go-pfcp/ie"
 )
 
 // QosConfigVal : Qos configured value.
@@ -47,14 +49,21 @@ type upf struct {
 	n4addr            string
 	accessIP          net.IP
 	coreIP            net.IP
-	nodeID            localNodeID
-	ippool            *IPPool
-	peers             []string
-	dnn               string
-	reportNotifyChan  chan uint64
-	sliceInfo         *SliceInfo
-	readTimeout       time.Duration
-	fteidGenerator    *FTEIDGenerator
+	// accessIP6 and coreIP6 are the interfaces' IPv6 GTP-U addresses, when they have
+	// one (see IfaceType); the zero Addr otherwise.
+	accessIP6 netip.Addr
+	coreIP6   netip.Addr
+	// n3Family restricts the F-TEIDs the UPF offers on N3 to one family; see
+	// IfaceType.TransportFamily.
+	n3Family         string
+	nodeID           localNodeID
+	ippool           *IPPool
+	peers            []string
+	dnn              string
+	reportNotifyChan chan uint64
+	sliceInfo        *SliceInfo
+	readTimeout      time.Duration
+	fteidGenerator   *FTEIDGenerator
 
 	datapath
 	maxReqRetries uint8
@@ -176,18 +185,87 @@ func setupPeersAndInterfaces(u *upf, conf *Conf) bool {
 		}
 	}
 
-	u.accessIP, err = GetUnicastAddressFromInterface(conf.AccessIface.IfName)
+	var accessIP4, coreIP4 netip.Addr
+
+	accessIP4, u.accessIP6, err = resolveTunnelAddrs(conf.AccessIface, tunnelAddrsFromInterface)
 	if err != nil {
 		logger.PfcpLog.Errorf("failed to get unicast address for access interface %q: %v", conf.AccessIface.IfName, err)
 		return false
 	}
 
-	u.coreIP, err = GetUnicastAddressFromInterface(conf.CoreIface.IfName)
+	coreIP4, u.coreIP6, err = resolveTunnelAddrs(conf.CoreIface, tunnelAddrsFromInterface)
 	if err != nil {
 		logger.PfcpLog.Errorf("failed to get unicast address for core interface %q: %v", conf.CoreIface.IfName, err)
 		return false
 	}
+
+	u.accessIP = ipFromAddr(accessIP4)
+	u.coreIP = ipFromAddr(coreIP4)
+	u.n3Family = conf.AccessIface.TransportFamily
+	logger.PfcpLog.Infof("GTP-U addresses: access %v %v (N3 transport family %q), core %v %v",
+		accessIP4, u.accessIP6, u.n3Family, coreIP4, u.coreIP6)
+
 	return true
+}
+
+// resolveTunnelAddrs returns an interface's GTP-U addresses: the ones its config names,
+// else the interface's own (lookup). transport_family "ipv4" leaves out the IPv6 one, so
+// an IPv4-only UPF behaves as one whatever addresses the interface has. An interface
+// with neither is an error.
+func resolveTunnelAddrs(
+	iface IfaceType, lookup func(string) (netip.Addr, netip.Addr, error),
+) (v4, v6 netip.Addr, err error) {
+	if iface.IPv4 == "" || iface.IPv6 == "" {
+		if v4, v6, err = lookup(iface.IfName); err != nil {
+			return v4, v6, err
+		}
+	}
+
+	if iface.IPv4 != "" {
+		v4 = netip.MustParseAddr(iface.IPv4) // validateIface checked it
+	}
+
+	if iface.IPv6 != "" {
+		v6 = netip.MustParseAddr(iface.IPv6)
+	}
+
+	if iface.TransportFamily == transportFamilyIPv4 {
+		v6 = netip.Addr{}
+	}
+
+	if !v4.IsValid() && !v6.IsValid() {
+		return v4, v6, ErrNotFoundWithParam("GTP-U address", "interface", iface.IfName)
+	}
+
+	return v4, v6, nil
+}
+
+// n3Addrs returns the N3 addresses the UPF offers in F-TEIDs it allocates and in its UP
+// IP Resource Information: the access interface's, less the family that
+// transport_family leaves out.
+func (u *upf) n3Addrs() (v4, v6 netip.Addr) {
+	v4 = addrFromIP(u.accessIP)
+	v6 = u.accessIP6
+
+	switch u.n3Family {
+	case transportFamilyIPv4:
+		v6 = netip.Addr{}
+	case transportFamilyIPv6:
+		v4 = netip.Addr{}
+	}
+
+	return v4, v6
+}
+
+// tunnelIP6Src is the IPv6 address a tunnel through dstIntf is sent from: the access
+// interface's for the RAN, the core interface's otherwise. The zero Addr when there is
+// none.
+func (u *upf) tunnelIP6Src(dstIntf uint8) netip.Addr {
+	if dstIntf == ie.DstInterfaceAccess {
+		return u.accessIP6
+	}
+
+	return u.coreIP6
 }
 
 func initTimersAndIPPool(u *upf, conf *Conf) {

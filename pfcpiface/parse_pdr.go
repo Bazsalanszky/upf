@@ -299,8 +299,9 @@ type pdr struct {
 	// tunnelIPDst is the F-TEID address the PDR matches GTP-U packets on, as a host
 	// prefix; the zero Prefix matches any.
 	tunnelIPDst netip.Prefix
-	// tunnelIPv6Dst is the IPv6 address of the F-TEID, when it has one. It is parsed but
-	// not matched on: the datapath forwards IPv4 only.
+	// tunnelIPv6Dst is the IPv6 address of the F-TEID, when it has one. The datapath
+	// matches it by its low-order 32 bits, in the field an IPv4 F-TEID address takes
+	// (see tunnelMatches); an F-TEID with both addresses is two rules.
 	tunnelIPv6Dst netip.Prefix
 	tunnelTEID    uint32
 	// ueAddress is the UE's IPv4 address; the zero Addr when the PDR names none.
@@ -337,6 +338,10 @@ type pdr struct {
 	// them, when hasChooseID says the control plane sent one (TS 29.244 clause 5.5.3).
 	chooseID    uint8
 	hasChooseID bool
+	// chooseV4 and chooseV6 are the families of the F-TEID address the control plane
+	// asks the UP function to choose (CH with V4, V6 or both; TS 29.244 clause 8.2.3).
+	chooseV4 bool
+	chooseV6 bool
 }
 
 // needAllocIP reports whether a UE IP Address IE asks the UP function to choose the UE's
@@ -369,6 +374,7 @@ func (p pdr) occupiesSameEntryAs(other pdr) bool {
 	return p.srcIface == other.srcIface &&
 		p.srcIfaceMask == other.srcIfaceMask &&
 		p.tunnelIPDst == other.tunnelIPDst &&
+		p.tunnelIPv6Dst == other.tunnelIPv6Dst &&
 		p.tunnelTEID == other.tunnelTEID &&
 		p.tunnelTEIDMask == other.tunnelTEIDMask &&
 		p.appFilter.srcIP == other.appFilter.srcIP &&
@@ -561,13 +567,11 @@ func (p *pdr) parseFTEID(teidIE *ie.IE) error {
 
 	teid := fteid.TEID
 	if fteid.HasCh() {
-		// CHOOSE with only the V6 flag asks for an IPv6 F-TEID (TS 29.244 clause 8.2.3).
-		// The UPF has none to give; it used to answer with its IPv4 one.
-		if fteid.HasIPv6() && !fteid.HasIPv4() {
-			return ErrUnsupported("F-TEID asking the UP function to choose an IPv6 address, flags",
-				fmt.Sprintf("0x%02x", fteid.Flags))
-		}
-
+		// With CH, V4 and V6 say which family of address the UP function is to choose;
+		// with both it chooses one or both (TS 29.244 clause 8.2.3). A CH with neither is
+		// read as V4, which is what this UPF has always answered it with.
+		p.chooseV4 = fteid.HasIPv4() || !fteid.HasIPv6()
+		p.chooseV6 = fteid.HasIPv6()
 		p.UPAllocateFteid = true
 		if fteid.HasChID() {
 			p.chooseID = fteid.ChooseID
@@ -576,11 +580,36 @@ func (p *pdr) parseFTEID(teidIE *ie.IE) error {
 	} else if teid != 0 {
 		p.tunnelTEID = teid
 		p.tunnelTEIDMask = 0xFFFFFFFF
-		p.tunnelIPDst = hostPrefix(addrFromIP(fteid.IPv4Address))
+		if fteid.HasIPv4() {
+			p.tunnelIPDst = hostPrefix(addrFromIP(fteid.IPv4Address))
+		}
 
 		if fteid.HasIPv6() {
 			p.tunnelIPv6Dst = hostPrefix(addrFromIP(fteid.IPv6Address))
 		}
+	}
+
+	return nil
+}
+
+// chooseFTEIDAddrs gives the PDR the N3 addresses its F-TEID asks the UP function to
+// choose (CH): of each family it asks for that the UPF offers, so both when it asks for
+// both and the UPF has both. None to give refuses the PDR.
+func (p *pdr) chooseFTEIDAddrs(n3v4, n3v6 netip.Addr) error {
+	p.tunnelIPDst, p.tunnelIPv6Dst = netip.Prefix{}, netip.Prefix{}
+
+	if p.chooseV4 && n3v4.IsValid() {
+		p.tunnelIPDst = hostPrefix(n3v4)
+	}
+
+	if p.chooseV6 && n3v6.IsValid() {
+		p.tunnelIPv6Dst = hostPrefix(n3v6)
+	}
+
+	if !p.tunnelIPDst.IsValid() && !p.tunnelIPv6Dst.IsValid() {
+		return ErrUnsupported("F-TEID asking the UP function to choose an address of a family it has none of; "+
+			"N3 offers IPv4/IPv6",
+			fmt.Sprintf("%t/%t, asked %t/%t", n3v4.IsValid(), n3v6.IsValid(), p.chooseV4, p.chooseV6))
 	}
 
 	return nil
@@ -850,13 +879,13 @@ func (p *pdr) parsePDR(ie1 *ie.IE, seid uint64, appPFDs map[string]appPFD, ippoo
 	return p.checkDatapathSupport()
 }
 
-// Outer Header Removal Descriptions (TS 29.244 clause 8.2.64). GTP-U/UDP/IP (6), either
-// family, leaves needDecap clear, as it always has.
+// Outer Header Removal Descriptions (TS 29.244 clause 8.2.64).
 const (
 	ohrGtpUUdpIPv4 = 0
 	ohrGtpUUdpIPv6 = 1
 	ohrUDPIPv6     = 3
 	ohrIPv6        = 5
+	ohrGtpUUdpIP   = 6
 )
 
 // checkDatapathSupport refuses a PDR the datapath cannot match as the control plane
@@ -874,8 +903,8 @@ func (p pdr) checkDatapathSupport() error {
 		return ErrUnsupported("PDR whose filter matches IPv6 only", p.appFilter6)
 	}
 
-	if p.tunnelIPv6Dst.IsValid() && !p.tunnelIPDst.IsValid() {
-		return ErrUnsupported("PDR on an IPv6-only F-TEID", p.tunnelIPv6Dst)
+	if p.tunnelIPv6Dst.IsValid() && !p.tunnelIPv6Dst.Addr().Is6() {
+		return ErrUnsupported("PDR on an F-TEID whose IPv6 address is not one", p.tunnelIPv6Dst)
 	}
 
 	for _, a := range []netip.Prefix{p.tunnelIPDst, p.appFilter.srcIP, p.appFilter.dstIP} {
@@ -914,11 +943,12 @@ func (p *pdr) parseCorePDRFields(
 	res, err := ie1.OuterHeaderRemovalDescription()
 	if err == nil {
 		switch res {
-		case ohrGtpUUdpIPv4:
+		case ohrGtpUUdpIPv4, ohrGtpUUdpIPv6, ohrGtpUUdpIP:
+			// GtpuDecap removes a GTP-U/UDP outer header of either family. GTP-U/UDP/IP
+			// (6) used to leave the header on, and forward the G-PDU as it came.
 			outerHeaderRemoval = 1
-		case ohrGtpUUdpIPv6, ohrUDPIPv6, ohrIPv6:
-			// The datapath parses IPv4 outer headers only: a PDR on IPv6 ones would
-			// never match, or would be matched on the wrong header.
+		case ohrUDPIPv6, ohrIPv6:
+			// Not GTP-U: the datapath has no rule that removes them.
 			return 0, 0, 0, 0, ErrUnsupported("Outer Header Removal of an IPv6 header, description", res)
 		}
 	}
