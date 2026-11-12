@@ -112,31 +112,36 @@ class GtpuIpv6Test(BessModuleTestCase):
         out = self.parse([n3v6(gtpu(0x30, 0xFF, INNER_UDP), dst=other)])
         self.assertEqual(out[0][16:20], ip4("10.10.3.1"))
 
-    def test_parser_leaves_other_ipv6_packets_unclassified(self):
-        cases = {
+    def test_parser_classifies_no_other_ipv6_packet_as_ipv4(self):
+        # Gate 1 is pdrLookup, for IPv4 UE packets. An IPv6 packet that is not a G-PDU
+        # with an IPv4 packet inside goes to gate 2 (pdrLookup6, gtpu_ue_ipv6.py) when
+        # it is a whole IPv6 packet, and to gate 0 when it is cut or carries no packet.
+        to_pdr_lookup6 = {
             "neighbour_solicitation": bytes(
                 ETH / scapy.IPv6(src="fe80::1", dst="ff02::1:ff00:1") / scapy.ICMPv6ND_NS(tgt=N3_6)
             ),
             "udp_other_port": bytes(ETH / scapy.IPv6(src=GNB_6, dst=N3_6) / scapy.UDP(sport=5000, dport=53) / b"q"),
-            # An extension header before UDP: not classified, not decapsulated.
+            # An extension header before UDP: classified on its own, not decapsulated.
             "hop_by_hop": bytes(
                 ETH / scapy.IPv6(src=GNB_6, dst=N3_6) / scapy.IPv6ExtHdrHopByHop()
                 / scapy.UDP(sport=2152, dport=2152) / scapy.Raw(gtpu(0x30, 0xFF, INNER_UDP))
             ),
             "ipv6_ue_packet": bytes(ETH / scapy.IPv6(src="2001:db8:500::1", dst="2001:db8::9") / scapy.UDP()),
+            "inner_ipv6": n3v6(gtpu(0x30, 0xFF, bytes(scapy.IPv6(src="fd00::1", dst="fd00::2") / scapy.UDP()))),
+        }
+        to_default = {
             "outer_ipv6_cut": GPDU6_UDP[: ETH_LEN + 30],
             "udp_cut": GPDU6_UDP[: ETH_LEN + 40 + 4],
             "end_marker": n3v6(gtpu(0x30, 254, b"")),
-            # Inner IPv6 is stage 3 of the port: still not classified.
-            "inner_ipv6": n3v6(gtpu(0x30, 0xFF, bytes(scapy.IPv6(src="fd00::1", dst="fd00::2") / scapy.UDP()))),
         }
-        for name, pkt in cases.items():
-            with self.subTest(case=name):
-                parser = GtpuParser()
-                out = self.run_module(parser, 0, [pkt], [0, 1])
-                self.assertEqual(len(out[1]), 0, f"{name} was classified")
-                self.assertEqual(len(out[0]), 1)
-                self.assertBessAlive()
+        for gate, cases in ((2, to_pdr_lookup6), (0, to_default)):
+            for name, pkt in cases.items():
+                with self.subTest(case=name):
+                    parser = GtpuParser()
+                    out = self.run_module(parser, 0, [pkt], [0, 1, 2])
+                    self.assertEqual(len(out[1]), 0, f"{name} was classified as IPv4")
+                    self.assertEqual(len(out[gate]), 1, f"{name} did not leave on gate {gate}")
+                    self.assertBessAlive()
 
     # ---------------------------------------------------------------- decap
     def test_decap_strips_an_ipv6_outer_header_and_fixes_the_ethertype(self):
