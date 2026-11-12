@@ -45,8 +45,16 @@ var (
 	endMarkerSrcMAC = [6]byte{0xFF, 0xAA, 0xFA, 0xAA, 0xFF, 0xAA} // Placeholder for local interface MAC
 )
 
+// addEndMarker appends a GTP-U End Marker for the tunnel farItem forwards on. The packet
+// is IPv4, so a tunnel with an IPv6 endpoint gets none.
 func addEndMarker(farItem far, endMarkerList *[][]byte) {
 	logger.PfcpLog.Infoln("adding end marker for farID:", farItem.farID)
+
+	tunnelSrc, tunnelDst, err := farItem.ipv4Tunnel()
+	if err != nil {
+		logger.PfcpLog.Errorln("no end marker for the old tunnel:", err)
+		return
+	}
 
 	packet := make([]byte, endMarkerSize)
 
@@ -64,8 +72,8 @@ func addEndMarker(farItem far, endMarkerList *[][]byte) {
 	packet[ipOffset+8] = 64                                                                     // TTL
 	packet[ipOffset+9] = 17                                                                     // UDP protocol
 	// Checksum at ipOffset+10 calculated below
-	binary.BigEndian.PutUint32(packet[ipSrcOffset:], farItem.tunnelIP4Src)
-	binary.BigEndian.PutUint32(packet[ipDstOffset:], farItem.tunnelIP4Dst)
+	binary.BigEndian.PutUint32(packet[ipSrcOffset:], tunnelSrc)
+	binary.BigEndian.PutUint32(packet[ipDstOffset:], tunnelDst)
 
 	// Calculate and set IPv4 checksum
 	binary.BigEndian.PutUint16(packet[ipChecksumOffset:], calculateIPv4Checksum(packet[ipOffset:ipOffset+ipv4HeaderSize]))

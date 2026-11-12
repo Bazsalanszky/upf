@@ -5,6 +5,7 @@ package pfcpiface
 
 import (
 	"net"
+	"net/netip"
 	"testing"
 
 	"github.com/wmnsk/go-pfcp/ie"
@@ -346,8 +347,8 @@ func TestTheParsedPDRCarriesTheSuppliedIPv4Address(t *testing.T) {
 		t.Fatalf("parseUEAddressIE: %v", err)
 	}
 
-	if want := ip2int(net.ParseIP(testUEIPv4)); p.ueAddress != want {
-		t.Errorf("ueAddress = %v, want %v", int2ip(p.ueAddress), testUEIPv4)
+	if want := netip.MustParseAddr(testUEIPv4); p.ueAddress != want {
+		t.Errorf("ueAddress = %v, want %v", p.ueAddress, testUEIPv4)
 	}
 
 	if p.allocIPFlag {

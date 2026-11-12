@@ -210,7 +210,7 @@ func TestASessionWhoseAddressBecameExplicitStillReleasesIt(t *testing.T) {
 		t.Fatal("the established session is not in the store")
 	}
 
-	ueAddress := int2ip(session.pdrs[0].ueAddress)
+	ueAddress := session.pdrs[0].ueAddress
 
 	modifySession(t, pConn, localSEID, ie.NewUpdatePDR(
 		ie.NewPDRID(downlinkPDRID),

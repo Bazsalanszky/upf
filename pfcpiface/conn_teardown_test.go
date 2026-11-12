@@ -6,6 +6,7 @@ package pfcpiface
 import (
 	"context"
 	"net"
+	"net/netip"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -44,7 +45,7 @@ func allocatingSession(t *testing.T, pool *IPPool, seid uint64) PFCPSession {
 			pdrs: []pdr{{
 				srcIface:    core,
 				allocIPFlag: true,
-				ueAddress:   ip2int(ip),
+				ueAddress:   addrFromIP(ip),
 			}},
 		},
 	}
@@ -157,8 +158,8 @@ type scriptedTeardownDP struct {
 	fakeDP
 
 	mu       sync.Mutex
-	finishes map[uint32][]bool
-	batches  map[uint32]int
+	finishes map[netip.Addr][]bool
+	batches  map[netip.Addr]int
 }
 
 func (d *scriptedTeardownDP) SendMsgToUPF(method upfMsgType, all, newRules PacketForwardingRules) uint8 {
@@ -173,7 +174,7 @@ func (d *scriptedTeardownDP) SendMsgToUPFWithCompletion(
 	defer d.mu.Unlock()
 
 	if d.batches == nil {
-		d.batches = map[uint32]int{}
+		d.batches = map[netip.Addr]int{}
 	}
 
 	ue := all.pdrs[0].ueAddress
@@ -210,7 +211,7 @@ func TestATeardownRemovalThatDidNotFinishIsRetried(t *testing.T) {
 	pConn, pool, sessions := teardownOfTwo(t)
 
 	a, b := sessions[0].pdrs[0].ueAddress, sessions[1].pdrs[0].ueAddress
-	dp := &scriptedTeardownDP{finishes: map[uint32][]bool{a: {false, true}, b: {false, true}}}
+	dp := &scriptedTeardownDP{finishes: map[netip.Addr][]bool{a: {false, true}, b: {false, true}}}
 	pConn.upf.datapath = dp
 
 	pConn.executeShutdown()
@@ -236,7 +237,7 @@ func TestATeardownRemovalThatNeverFinishesHoldsOnlyItsOwnAddress(t *testing.T) {
 	pConn, pool, sessions := teardownOfTwo(t)
 
 	stuck, drained := sessions[0].pdrs[0].ueAddress, sessions[1].pdrs[0].ueAddress
-	dp := &scriptedTeardownDP{finishes: map[uint32][]bool{
+	dp := &scriptedTeardownDP{finishes: map[netip.Addr][]bool{
 		stuck:   {false, false},
 		drained: {false, true},
 	}}
@@ -254,9 +255,9 @@ func TestATeardownRemovalThatNeverFinishesHoldsOnlyItsOwnAddress(t *testing.T) {
 			"finished was held with the one whose retry did not", err)
 	}
 
-	if ip2int(got) != drained {
+	if addrFromIP(got) != drained {
 		t.Fatalf("the pool gave out %s, expected %s, the address of the session whose "+
-			"rules were removed", got, int2ip(drained))
+			"rules were removed", got, drained)
 	}
 
 	if _, err := pool.LookupOrAllocIP(4); err == nil {
@@ -272,7 +273,7 @@ type rendezvousTeardownDP struct {
 	fakeDP
 
 	mu      sync.Mutex
-	seen    map[uint32]int
+	seen    map[netip.Addr]int
 	arrived sync.WaitGroup
 	apart   atomic.Bool
 }
@@ -313,7 +314,7 @@ func (d *rendezvousTeardownDP) SendMsgToUPFWithCompletion(
 func TestTeardownRetriesRunTogether(t *testing.T) {
 	pConn, _, _ := teardownOfTwo(t)
 
-	dp := &rendezvousTeardownDP{seen: map[uint32]int{}}
+	dp := &rendezvousTeardownDP{seen: map[netip.Addr]int{}}
 	dp.arrived.Add(2)
 	pConn.upf.datapath = dp
 

@@ -4,7 +4,7 @@
 package pfcpiface
 
 import (
-	"net"
+	"net/netip"
 	"testing"
 
 	"github.com/wmnsk/go-pfcp/ie"
@@ -164,7 +164,7 @@ func TestACreateThenUpdateOfOnePdrIsWrittenOnce(t *testing.T) {
 		}
 	}
 
-	if len(written) != 1 || written[0].appFilter.dstIP != ip2int(net.ParseIP(thirdUEAddress)) {
+	if len(written) != 1 || written[0].appFilter.dstIP != hostPrefix(netip.MustParseAddr(thirdUEAddress)) {
 		t.Fatalf("the write carries PDR %d as %v, expected once, at %s; the session holds "+
 			"only the Update's version", secondPDRID, written, thirdUEAddress)
 	}
@@ -216,7 +216,7 @@ func writtenPDRAddresses(t *testing.T, dp *recordingDP, id uint32) map[string]bo
 
 	for _, p := range acceptedWrite(t, dp).pdrs {
 		if p.pdrID == id {
-			at[int2ip(p.appFilter.dstIP).String()] = true
+			at[p.appFilter.dstIP.Addr().String()] = true
 		}
 	}
 
@@ -317,7 +317,7 @@ func TestARollbackLeavesTheDuplicateAnUpdateDidNotReplace(t *testing.T) {
 		updateTheDownlinkPDR(thirdUEAddress, establishedPrecedence))
 
 	for _, p := range rollbackDeletion(t, dp).pdrs {
-		if p.appFilter.dstIP == ip2int(net.ParseIP(secondUEAddress)) {
+		if p.appFilter.dstIP == hostPrefix(netip.MustParseAddr(secondUEAddress)) {
 			t.Fatalf("the rollback removed PDR %d at %s, the rule of that ID the Update did "+
 				"not touch", p.pdrID, secondUEAddress)
 		}

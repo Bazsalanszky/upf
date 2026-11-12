@@ -47,7 +47,7 @@ func (r *pathMonitoringRecorder) ModuleCommand(
 		return nil, err
 	}
 
-	ip := int2ip(a.GetGnbIp()).String()
+	ip := addrFromIPv4Field(a.GetGnbIp()).String()
 
 	r.mu.Lock()
 	defer r.mu.Unlock()

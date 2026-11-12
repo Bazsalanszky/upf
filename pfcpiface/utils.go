@@ -5,7 +5,6 @@
 package pfcpiface
 
 import (
-	"encoding/binary"
 	"net"
 	"strconv"
 	"strings"
@@ -73,25 +72,6 @@ func inc(ip net.IP) {
 	}
 }
 
-func ip2int(ip net.IP) uint32 {
-	// Guard against IP with insufficient length (need at least 4 bytes for uint32)
-	if len(ip) < 4 {
-		return 0
-	}
-	if len(ip) == 16 {
-		return binary.BigEndian.Uint32(ip[12:16])
-	}
-	return binary.BigEndian.Uint32(ip)
-}
-
-func ipMask2int(ip net.IPMask) uint32 {
-	if len(ip) == 16 {
-		return binary.BigEndian.Uint32(ip[12:16])
-	}
-
-	return binary.BigEndian.Uint32(ip)
-}
-
 func hex2int(hexStr string) uint32 {
 	// remove 0x suffix if found in the input string
 	cleaned := strings.ReplaceAll(hexStr, "0x", "")
@@ -103,13 +83,6 @@ func hex2int(hexStr string) uint32 {
 	}
 
 	return uint32(result)
-}
-
-func int2ip(nn uint32) net.IP {
-	ip := make(net.IP, 4)
-	binary.BigEndian.PutUint32(ip, nn)
-
-	return ip
 }
 
 func maxUint64(x, y uint64) uint64 {

@@ -5,6 +5,7 @@ package pfcpiface
 
 import (
 	"fmt"
+	"net/netip"
 
 	"github.com/omec-project/upf-epc/logger"
 	"github.com/wmnsk/go-pfcp/ie"
@@ -33,23 +34,23 @@ const (
 type far struct {
 	farID   uint32
 	fseID   uint64
-	fseidIP uint32
+	fseidIP netip.Addr
 
 	dstIntf       uint8
 	sendEndMarker bool
 	applyAction   uint8
 	tunnelType    uint8
-	tunnelIP4Src  uint32
-	tunnelIP4Dst  uint32
+	tunnelIPSrc   netip.Addr
+	tunnelIPDst   netip.Addr
 	tunnelTEID    uint32
 	tunnelPort    uint16
 }
 
 func (f far) String() string {
-	return fmt.Sprintf("FAR(id=%v, F-SEID=%v, F-SEID IPv4=%v, dstInterface=%v, tunnelType=%v, "+
-		"tunnelIPv4Src=%v, tunnelIPv4Dst=%v, tunnelTEID=%v, tunnelSrcPort=%v, "+
-		"sendEndMarker=%v, drops=%v, forwards=%v, buffers=%v)", f.farID, f.fseID, int2ip(f.fseidIP), f.dstIntf,
-		f.tunnelType, int2ip(f.tunnelIP4Src), int2ip(f.tunnelIP4Dst), f.tunnelTEID, f.tunnelPort, f.sendEndMarker,
+	return fmt.Sprintf("FAR(id=%v, F-SEID=%v, F-SEID IP=%v, dstInterface=%v, tunnelType=%v, "+
+		"tunnelIPSrc=%v, tunnelIPDst=%v, tunnelTEID=%v, tunnelSrcPort=%v, "+
+		"sendEndMarker=%v, drops=%v, forwards=%v, buffers=%v)", f.farID, f.fseID, f.fseidIP, f.dstIntf,
+		f.tunnelType, f.tunnelIPSrc, f.tunnelIPDst, f.tunnelTEID, f.tunnelPort, f.sendEndMarker,
 		f.Drops(), f.Forwards(), f.Buffers())
 }
 
@@ -90,7 +91,7 @@ func (f *far) parseFAR(farIE *ie.IE, fseid uint64, upf *upf, op operation) error
 			}
 
 			f.tunnelTEID = ohcFields.TEID
-			f.tunnelIP4Dst = ip2int(ohcFields.IPv4Address)
+			f.tunnelIPDst = addrFromIP(ohcFields.IPv4Address)
 			f.tunnelType = uint8(1) // Preserve the existing tunnel type encoding for GTP-U forwarding.
 			f.tunnelPort = tunnelGTPUPort
 		case ie.DestinationInterface:
@@ -104,9 +105,9 @@ func (f *far) parseFAR(farIE *ie.IE, fseid uint64, upf *upf, op operation) error
 
 			switch f.dstIntf {
 			case ie.DstInterfaceAccess:
-				f.tunnelIP4Src = ip2int(upf.accessIP)
+				f.tunnelIPSrc = addrFromIP(upf.accessIP)
 			case ie.DstInterfaceCore:
-				f.tunnelIP4Src = ip2int(upf.coreIP)
+				f.tunnelIPSrc = addrFromIP(upf.coreIP)
 			}
 		case ie.PFCPSMReqFlags:
 			fields = Set(fields, FwdIEPfcpSMReqFlags)

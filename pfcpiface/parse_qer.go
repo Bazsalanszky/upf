@@ -5,6 +5,7 @@ package pfcpiface
 
 import (
 	"fmt"
+	"net/netip"
 
 	"github.com/omec-project/upf-epc/logger"
 	"github.com/wmnsk/go-pfcp/ie"
@@ -26,7 +27,7 @@ type qer struct {
 	ulGbr    uint64 // in kilobits/sec
 	dlGbr    uint64 // in kilobits/sec
 	fseID    uint64
-	fseidIP  uint32
+	fseidIP  netip.Addr
 }
 
 // occupiesSameEntryAs reports whether both rules would land on the same datapath entry.
