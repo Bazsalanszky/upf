@@ -7,12 +7,13 @@ import argparse
 import ipaddress
 import logging
 import signal
+import socket
 import sys
 import time
 from collections import defaultdict
 from dataclasses import dataclass, field, replace
 from queue import Queue
-from socket import AF_INET, if_indextoname
+from socket import AF_INET, AF_INET6, if_indextoname, if_nametoindex
 from threading import Lock, Thread
 
 from pybess.bess import *
@@ -42,8 +43,14 @@ ROUTE_TABLE_LOCAL = 255
 ROUTE_SCOPE_HOST = (254, "host")
 MAX_ON_LINK_NEIGHBORS_PER_NETWORK = 512
 IPV4_HOST_PREFIX_LEN = 32
+IPV6_HOST_PREFIX_LEN = 128
+# A UDP datagram to this port makes the kernel resolve an IPv6 neighbour
+# (Neighbor Discovery, RFC 4861 7.2.2) the way a ping resolves an IPv4 one.
+ND_PROBE_PORT = 9
 
-OnLinkNetworks = dict[str, dict[ipaddress.IPv4Network, set[str]]]
+OnLinkNetworks = dict[
+    str, dict[ipaddress.IPv4Network | ipaddress.IPv6Network, set[str]]
+]
 
 
 @dataclass
@@ -129,7 +136,7 @@ class BessController:
                 self._bess.run_module_command(
                     module_name,
                     "add",
-                    "IPLookupCommandAddArg",
+                    lookup_arg_class(route_entry.dest_prefix, "Add"),
                     {
                         "prefix": route_entry.dest_prefix,
                         "prefix_len": route_entry.prefix_len,
@@ -166,14 +173,16 @@ class BessController:
         Args:
             route_entry (RouteEntry): The neighbor entry.
         """
-        route_module = str(route_entry.interface) + "Routes"
+        route_module = get_route_module_name(
+            str(route_entry.interface), ip_family(route_entry.dest_prefix)
+        )
         for _ in range(self.MAX_RETRIES):
             try:
                 self._bess.pause_all()
                 self._bess.run_module_command(
                     route_module,
                     "delete",
-                    "IPLookupCommandDeleteArg",
+                    lookup_arg_class(route_entry.dest_prefix, "Delete"),
                     {
                         "prefix": route_entry.dest_prefix,
                         "prefix_len": int(route_entry.prefix_len),
@@ -285,6 +294,14 @@ class BessController:
                 f"BESS module connection ({module}:{ogate}->{igate}:{next_module}) failure."
             )
 
+    def module_exists(self, module_name: str) -> bool:
+        """Reports whether BESS has a module of this name."""
+        try:
+            self._bess.get_module_info(module_name)
+        except BESS.Error:
+            return False
+        return True
+
     def delete_module(self, module_name: str) -> None:
         """Deletes a BESS module.
 
@@ -358,6 +375,15 @@ class RouteController:
         self._module_gate_count_cache: dict[str, int] = defaultdict(lambda: 0)
         self._on_link_networks: OnLinkNetworks = defaultdict(dict)
         self._programmed_routes: dict[tuple[str, str, int], str] = {}
+        # Update modules, by name, and how many next hops use each. A next
+        # hop's MAC is all its Update module holds, so next hops with the
+        # same MAC share one: a router's IPv4 address, its global IPv6
+        # address and its link-local one, say.
+        self._update_module_refs: dict[str, int] = defaultdict(lambda: 0)
+        # The interfaces with an IPv6 route module ({name}Routes6, which
+        # ports.py creates for a port with an IPv6 address). IPv6 routes on
+        # the others are left alone.
+        self._ipv6_interfaces: set[str] = set()
 
         self._lock = Lock()
 
@@ -419,7 +445,16 @@ class RouteController:
 
     def bootstrap_routes(self) -> None:
         """Goes through all routes and handles new ones."""
-        routes = self._ipr.get_routes(family=AF_INET)
+        self._ipv6_interfaces = {
+            interface
+            for interface in self._interfaces
+            if self._bess_controller.module_exists(get_route_module_name(interface, 6))
+        }
+        if self._ipv6_interfaces:
+            logger.info("Routing IPv6 on %s", sorted(self._ipv6_interfaces))
+        routes = list(self._ipr.get_routes(family=AF_INET))
+        if self._ipv6_interfaces:
+            routes += list(self._ipr.get_routes(family=AF_INET6))
         for route in routes:
             if route["event"] == KEY_NEW_ROUTE_ACTION and (
                 route_entry := self._parse_route_entry_msg(route)
@@ -433,20 +468,18 @@ class RouteController:
         Args:
             route_entry (RouteEntry): The route entry.
         """
+        # A route of a family this interface does not route is left alone.
+        if not self._routes_family(route_entry):
+            return
+
         # This route replaces any version of it still waiting for a next hop,
         # an attached network included: if the old next hop resolved later, the
         # route would be installed through it although the kernel no longer has
-        # it. A gateway route is checked for IPv4 first, since an IPv6 default
-        # route parses to the IPv4 default's key. An attached network is never
-        # a default route, so its key cannot be shared that way.
-        if route_entry.on_link or validate_ipv4(route_entry.next_hop_ip):
-            self._unresolved_arp_queries_cache.pop(route_key(route_entry), None)
+        # it.
+        self._unresolved_arp_queries_cache.pop(route_key(route_entry), None)
 
         if route_entry.on_link:
             self._add_on_link_network(route_entry)
-            return
-
-        if not validate_ipv4(route_entry.next_hop_ip):
             return
         # Short-circuit so an already programmed route is not probed for;
         # _add_neighbor holds the guard that keeps the install itself unique.
@@ -478,6 +511,10 @@ class RouteController:
         """
         network = self._parse_network(route_entry)
         if network is None or route_entry.interface is None:
+            return
+        if network.is_link_local or network.is_multicast:
+            # fe80::/64 is on every IPv6 interface, and nothing is ever
+            # routed to a link-local or multicast destination.
             return
 
         networks = self._on_link_networks[route_entry.interface]
@@ -517,7 +554,8 @@ class RouteController:
                 attached network here, is already recorded, the network is at
                 its limit, or the route could not be installed.
         """
-        if not validate_ipv4(host_ip):
+        family = ip_family(host_ip)
+        if family is None or (family == 6 and interface not in self._ipv6_interfaces):
             return False
 
         network = self._on_link_network_for(interface, host_ip)
@@ -549,7 +587,7 @@ class RouteController:
                 dest_prefix=host_ip,
                 next_hop_ip=host_ip,
                 interface=interface,
-                prefix_len=IPV4_HOST_PREFIX_LEN,
+                prefix_len=host_prefix_len(host_ip),
             ),
             host_mac,
         ):
@@ -566,7 +604,7 @@ class RouteController:
 
     def _on_link_network_for(
         self, interface: str, host_ip: str
-    ) -> ipaddress.IPv4Network | None:
+    ) -> ipaddress.IPv4Network | ipaddress.IPv6Network | None:
         """Finds the attached network on interface that contains host_ip."""
         if interface not in self._on_link_networks:
             return None
@@ -582,8 +620,9 @@ class RouteController:
     def _neighbors_on(self, interface: str) -> list[tuple[str, str]]:
         """Lists the addresses the kernel has resolved on an interface.
 
-        The dump covers every family. An IPv6 neighbor needs no filtering: it
-        cannot match an IPv4 network, which is False rather than an error.
+        The dump covers every family. A neighbor is matched against the
+        attached networks of its own family only: an address of the other
+        family is not in the network, which is False rather than an error.
 
         Returns:
             list[tuple[str, str]]: Address and MAC for each resolved neighbor.
@@ -620,7 +659,9 @@ class RouteController:
             return None
 
     @staticmethod
-    def _parse_network(route_entry: RouteEntry) -> ipaddress.IPv4Network | None:
+    def _parse_network(
+        route_entry: RouteEntry,
+    ) -> ipaddress.IPv4Network | ipaddress.IPv6Network | None:
         """Builds the network a route entry describes."""
         try:
             return ipaddress.ip_network(
@@ -677,7 +718,9 @@ class RouteController:
                 return False
 
         if route_entry.interface is not None:
-            route_module_name = get_route_module_name(route_entry.interface)
+            route_module_name = get_route_module_name(
+                route_entry.interface, ip_family(route_entry.dest_prefix)
+            )
             gate_idx = self._get_gate_idx(route_entry, route_module_name)
             try:
                 self._bess_controller.add_route_to_module(
@@ -703,16 +746,23 @@ class RouteController:
                         next_hop_mac,
                     )
                     merge_module_name = get_merge_module_name(route_entry.interface)
-                    self._create_update_module(
-                        destination_mac=next_hop_mac,
-                        update_module_name=update_module_name,
-                    )
-                    self._create_module_links(
+                    new_module = self._update_module_refs[update_module_name] == 0
+                    if new_module:
+                        self._create_update_module(
+                            destination_mac=next_hop_mac,
+                            update_module_name=update_module_name,
+                        )
+                    self._update_module_refs[update_module_name] += 1
+                    self._link_route_gate(
                         gate_idx=gate_idx,
                         update_module_name=update_module_name,
                         route_module_name=route_module_name,
-                        merge_module_name=merge_module_name,
                     )
+                    if new_module:
+                        self._link_update_module(
+                            update_module_name=update_module_name,
+                            merge_module_name=merge_module_name,
+                        )
                     self._neighbor_cache[route_entry.next_hop_ip] = NeighborEntry(
                         gate_idx=gate_idx,
                         mac_address=next_hop_mac,
@@ -768,6 +818,9 @@ class RouteController:
             # The kernel reports a neighbor it is resolving, or failed to
             # resolve, without a MAC address; its routes keep waiting.
             return
+        interface = self._interface_name(netlink_message.get("ifindex"))
+        if interface is not None:
+            neighbor_ip = scoped_next_hop(neighbor_ip, interface)
         # Each route leaves the queue before it is added, so releasing a next
         # hop it is moving off cannot cancel the route being resolved -- the
         # entry the release in #1379 was separated to spare.
@@ -783,7 +836,6 @@ class RouteController:
         # an attached network, and resolving it answers only the routes that
         # were waiting on it. Its own address still needs a host route, and
         # shares the gate just resolved for it.
-        interface = self._interface_name(netlink_message.get("ifindex"))
         if interface is None:
             return
         if self._add_on_link_host(interface, neighbor_ip, gateway_mac):
@@ -793,20 +845,18 @@ class RouteController:
                 interface,
             )
 
-    def _create_module_links(
+    def _link_route_gate(
         self,
         gate_idx: int,
         update_module_name: str,
         route_module_name: str,
-        merge_module_name: str,
     ) -> None:
-        """Create update module and link modules.
+        """Links a route module's gate for a next hop to its Update module.
 
         Args:
             gate_idx (int): Output gate index.
             update_module_name (str): The name of the update module.
             route_module_name (str): The name of the route module.
-            merge_module_name (str): The name of the merge module.
         """
         try:
             self._bess_controller.link_modules(
@@ -818,8 +868,18 @@ class RouteController:
                 update_module_name,
                 route_module_name,
             )
-            return
 
+    def _link_update_module(
+        self,
+        update_module_name: str,
+        merge_module_name: str,
+    ) -> None:
+        """Links a new Update module to the interface's Merge module.
+
+        Args:
+            update_module_name (str): The name of the update module.
+            merge_module_name (str): The name of the merge module.
+        """
         try:
             self._bess_controller.link_modules(
                 update_module_name, merge_module_name, 0, 0
@@ -848,10 +908,7 @@ class RouteController:
             self._delete_on_link_network(route_entry)
             return
 
-        # A default route has no RTA_DST, so an IPv6 one parses to 0.0.0.0/0
-        # and shares the IPv4 default's key. Neither cache may be reached with
-        # it: the key would match and the recorded next hop be substituted.
-        if not validate_ipv4(route_entry.next_hop_ip):
+        if not self._routes_family(route_entry):
             return
 
         key = route_key(route_entry)
@@ -895,23 +952,30 @@ class RouteController:
 
                 if next_hop.route_count == 0:
                     if route_entry.interface is not None:
-                        route_module = get_route_module_name(route_entry.interface)
                         if next_hop.mac_address is not None:
+                            # The name the module was created under in
+                            # _add_neighbor: by interface, not route module.
                             update_module_name = get_update_module_name(
-                                route_module_name=route_module,
+                                route_entry.interface,
                                 mac_address=next_hop.mac_address,
                             )
 
-                            try:
-                                self._bess_controller.delete_module(update_module_name)
-                            except Exception:
-                                logger.exception(
-                                    "Error deleting update module %s",
-                                    update_module_name,
-                                )
-                                return
-
-                            logger.info("Module deleted %s", update_module_name)
+                            # Another next hop with this MAC still uses it.
+                            if self._update_module_refs[update_module_name] <= 1:
+                                try:
+                                    self._bess_controller.delete_module(
+                                        update_module_name
+                                    )
+                                except Exception:
+                                    logger.exception(
+                                        "Error deleting update module %s",
+                                        update_module_name,
+                                    )
+                                    return
+                                self._update_module_refs.pop(update_module_name, None)
+                                logger.info("Module deleted %s", update_module_name)
+                            else:
+                                self._update_module_refs[update_module_name] -= 1
 
                             del self._neighbor_cache[route_entry.next_hop_ip]
                             logger.info("Deleted item from neighbor cache")
@@ -967,7 +1031,7 @@ class RouteController:
                     dest_prefix=host_ip,
                     next_hop_ip=host_ip,
                     interface=route_entry.interface,
-                    prefix_len=IPV4_HOST_PREFIX_LEN,
+                    prefix_len=host_prefix_len(host_ip),
                 )
             )
 
@@ -1007,6 +1071,16 @@ class RouteController:
             send_ping(route_entry.next_hop_ip)
         else:
             logger.warning("next_hop_ip is None, cannot add to arp table")
+
+    def _routes_family(self, route_entry: RouteEntry) -> bool:
+        """Reports whether the route's family is routed on its interface:
+        IPv4 always, IPv6 where there is an IPv6 route module."""
+        family = ip_family(route_entry.dest_prefix)
+        if family == 4:
+            return route_entry.on_link or validate_ipv4(route_entry.next_hop_ip)
+        if family == 6 and route_entry.interface in self._ipv6_interfaces:
+            return route_entry.on_link or ip_family(route_entry.next_hop_ip) == 6
+        return False
 
     def _get_gate_idx(self, route_entry: RouteEntry, module_name: str) -> int:
         """Get gate index for a route module.
@@ -1127,6 +1201,7 @@ class RouteController:
             self._module_gate_count_cache.clear()
             self._on_link_networks.clear()
             self._programmed_routes.clear()
+            self._update_module_refs.clear()
         self.bootstrap_routes()
         signal.pause()
         logger.info("Received: %i reconfigured", number)
@@ -1169,9 +1244,16 @@ class RouteController:
         if interface not in self._interfaces:
             return None
 
+        # A link-local next hop is only an address together with its
+        # interface, so it carries the interface as its scope: fe80::1 on
+        # two interfaces is two next hops (see scoped_next_hop()).
+        if next_hop_ip:
+            next_hop_ip = scoped_next_hop(next_hop_ip, interface)
+
+        # A default route has no RTA_DST; its family says which default it is.
         dest_prefix = None
         if route_entry.get(KEY_DESTINATION_PREFIX_LENGTH) == 0:
-            dest_prefix = "0.0.0.0"
+            dest_prefix = "::" if route_entry.get("family") == AF_INET6 else "0.0.0.0"
 
         if attr_dict.get(KEY_DESTINATION_IP):
             dest_prefix = attr_dict.get(KEY_DESTINATION_IP)
@@ -1222,13 +1304,47 @@ def route_key(route_entry: RouteEntry) -> tuple[str, str, int]:
     )
 
 
-def get_route_module_name(interface_name: str) -> str:
+def get_route_module_name(interface_name: str, family: int | None = 4) -> str:
     """Returns the name of the route module.
 
     Args:
         interface_name (str): The name of the interface.
+        family (int): 4 for the IPv4 table, 6 for the IPv6 one.
     """
-    return interface_name + "Routes"
+    return interface_name + ("Routes6" if family == 6 else "Routes")
+
+
+def lookup_arg_class(prefix: str | None, command: str) -> str:
+    """The argument class of a route module command ("Add" or "Delete")
+    for a prefix: IPLookup's for IPv4, IP6Lookup's for IPv6."""
+    module = "IP6Lookup" if ip_family(prefix) == 6 else "IPLookup"
+    return f"{module}Command{command}Arg"
+
+
+def ip_family(ip: str | None) -> int | None:
+    """4 or 6 for an IPv4 or IPv6 address (scoped or not), None otherwise."""
+    if ip is None:
+        return None
+    try:
+        return ipaddress.ip_address(ip).version
+    except ValueError:
+        return None
+
+
+def host_prefix_len(ip: str) -> int:
+    return IPV6_HOST_PREFIX_LEN if ip_family(ip) == 6 else IPV4_HOST_PREFIX_LEN
+
+
+def scoped_next_hop(ip: str, interface: str) -> str:
+    """A link-local IPv6 address with its interface as scope (fe80::1%eth0);
+    any other address as it is."""
+    try:
+        address = ipaddress.ip_address(ip)
+    except ValueError:
+        return ip
+    if address.version == 6 and address.is_link_local and "%" not in ip:
+        return f"{ip}%{interface}"
+    return ip
 
 
 def get_update_module_name(route_module_name: str, mac_address: str) -> str:
@@ -1269,9 +1385,25 @@ def send_ping(neighbor_ip):
 
     Does not wait for a response. Expected to have the side
     effect of populating the arp table entry for neighbor_ip.
+    An IPv6 neighbor is sent an empty UDP datagram instead, which has the
+    kernel resolve it by Neighbor Discovery (see send_nd_probe()).
     """
+    if ip_family(neighbor_ip) == 6:
+        send_nd_probe(neighbor_ip)
+        return
     send(IP(dst=neighbor_ip) / ICMP())
     logger.info("Sent ping to %s", neighbor_ip)
+
+
+def send_nd_probe(neighbor_ip: str) -> None:
+    """Has the kernel resolve an IPv6 neighbor: an empty UDP datagram to it
+    makes the kernel send a Neighbor Solicitation first. A link-local one
+    names its interface as scope (fe80::1%eth0)."""
+    address, _, scope = neighbor_ip.partition("%")
+    scope_id = if_nametoindex(scope) if scope else 0
+    with socket.socket(AF_INET6, socket.SOCK_DGRAM) as sock:
+        sock.sendto(b"", (address, ND_PROBE_PORT, 0, scope_id))
+    logger.info("Sent a neighbor discovery probe to %s", neighbor_ip)
 
 
 def fetch_mac(ndb: NDB, target_ip: str | None) -> str | None:
@@ -1284,9 +1416,21 @@ def fetch_mac(ndb: NDB, target_ip: str | None) -> str | None:
     Returns:
         Optional[str]: The MAC address of the target IP.
     """
+    if target_ip is None:
+        return None
+    # A link-local next hop is matched on its interface as well.
+    address, _, scope = target_ip.partition("%")
+    ifindex = None
+    if scope:
+        try:
+            ifindex = if_nametoindex(scope)
+        except OSError:
+            return None
     neighbors = ndb.neighbours.dump()
     for neighbor in neighbors:
-        if neighbor["dst"] == target_ip:
+        if neighbor["dst"] == address and (
+            ifindex is None or neighbor["ifindex"] == ifindex
+        ):
             logger.info(
                 "Mac address found for %s, Mac: %s",
                 target_ip,
@@ -1311,7 +1455,7 @@ def mac_to_hex(mac: str) -> str:
 
 
 def parse_args() -> tuple[list[str], str, str]:
-    parser = argparse.ArgumentParser(description="Basic IPv4 Routing Controller")
+    parser = argparse.ArgumentParser(description="Basic IPv4/IPv6 Routing Controller")
     parser.add_argument("-i", type=str, nargs="+", help="interface(s) to control")
     parser.add_argument("--ip", type=str, default="localhost", help="BESSD address")
     parser.add_argument("--port", type=str, default="10514", help="BESSD port")

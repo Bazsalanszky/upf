@@ -49,8 +49,11 @@ def scan_dpdk_ports():
 
 
 class Port:
-    def __init__(self, name, hwcksum, ext_addrs):
+    def __init__(self, name, hwcksum, ext_addrs, ipv6=False):
         self.name = name
+        # With ipv6, packets leaving the port are routed by family: IPv4 by
+        # {name}Routes as before, IPv6 by {name}Routes6 (route_control.py).
+        self.ipv6 = ipv6
         self.flow_profiles = []
         self.workers = None
         self.num_q = 1
@@ -122,6 +125,30 @@ class Port:
         self.rtr.add(prefix="0.0.0.0", prefix_len=0, gate=MAX_GATES - 1)
         s = Sink(name=f"{name}bad_route")
         self.rtr.connect(next_mod=s, ogate=MAX_GATES - 1)
+
+        if self.ipv6:
+            self.init_ipv6_routes(s)
+
+    def init_ipv6_routes(self, bad_route):
+        # IPLookup sends every packet that is not IPv4 to its default route,
+        # so the IPv6 ones are split off before it: by EtherType, IPv6 to
+        # gate 1 and {name}Routes6, everything else to gate 0 and the IPv4
+        # table as before. Only a port with an IPv6 address has this stage.
+        name = self.name
+        rtr6 = IP6Lookup(
+            name=f"{name}Routes6",
+            max_rules=MAX_ROUTE6_RULES,
+            max_tbl8s=MAX_ROUTE6_TBL8S,
+        )
+        rtr6.add(prefix="::", prefix_len=0, gate=MAX_GATES - 1)
+        rtr6.connect(next_mod=bad_route, ogate=MAX_GATES - 1)
+
+        split = BPF(name=f"{name}FamilySplit")
+        split.clear()
+        split.add(filters=[{"priority": 1, "filter": "ip6", "gate": 1}])
+        split.connect(next_mod=self.rtr, ogate=0)
+        split.connect(next_mod=rtr6, ogate=1)
+        self.rtr = split
 
     def init_port(self, idx, conf_mode):
         name = self.name
@@ -245,10 +272,17 @@ class Port:
                 # host_ip_filter: tcpdump -i foo 'dst host 198.19.0.1 or 198.18.0.1' -d
                 # Should always be set to lowest priority
                 HostGate = MAX_GATES - 1
-                ips = ips_by_interface(name)
+                ips = ips_by_interface(name) + ip6s_by_interface(name)
+                host_filter = " or ".join(f"dst host {x}" for x in ips)
+                if self.ipv6:
+                    # Neighbour Discovery goes to solicited-node multicast
+                    # addresses, not to the port's own: ICMPv6 types 133-137
+                    # (RFC 4861) reach the kernel whatever their destination.
+                    nd = "(icmp6 and ip6[40] >= 133 and ip6[40] <= 137)"
+                    host_filter = f"{host_filter} or {nd}" if host_filter else nd
                 host_ip_filter = {
                     "priority": -HostGate,
-                    "filter": "dst host " + " or ".join(str(x) for x in ips),
+                    "filter": host_filter,
                     "gate": HostGate,
                 }
 
