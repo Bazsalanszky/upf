@@ -127,42 +127,6 @@ func TestMatchPrefix(t *testing.T) {
 	}
 }
 
-func TestPrefixFromIPNet(t *testing.T) {
-	mustCIDR := func(s string) *net.IPNet {
-		_, n, err := net.ParseCIDR(s)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		return n
-	}
-
-	for _, tc := range []struct {
-		name string
-		in   *net.IPNet
-		want netip.Prefix
-	}{
-		{"nil", nil, netip.Prefix{}},
-		{"IPv4 /32", mustCIDR("10.0.0.1/32"), netip.MustParsePrefix("10.0.0.1/32")},
-		{"IPv4 /24", mustCIDR("10.0.0.1/24"), netip.MustParsePrefix("10.0.0.0/24")},
-		{"IPv4 /0", mustCIDR("0.0.0.0/0"), netip.Prefix{}},
-		{
-			"IPv4 in 16 bytes, 16-byte mask",
-			&net.IPNet{IP: net.ParseIP("10.0.0.0"), Mask: net.CIDRMask(120, 128)},
-			netip.MustParsePrefix("10.0.0.0/24"),
-		},
-		{"IPv6 /64", mustCIDR("2001:db8:a0b:12f0::1/64"), netip.MustParsePrefix("2001:db8:a0b:12f0::/64")},
-		{"IPv6 /128", mustCIDR("2001:db8::1/128"), netip.MustParsePrefix("2001:db8::1/128")},
-		{"non-canonical mask", &net.IPNet{IP: net.IP{10, 0, 0, 0}, Mask: net.IPMask{255, 0, 255, 0}}, netip.Prefix{}},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			if got := prefixFromIPNet(tc.in); got != tc.want {
-				t.Errorf("prefixFromIPNet(%v) = %v, want %v", tc.in, got, tc.want)
-			}
-		})
-	}
-}
-
 func TestIPv4WithOffset(t *testing.T) {
 	if got, want := ipv4WithOffset(net.ParseIP("10.0.0.254"), 3), netip.MustParseAddr("10.0.1.1"); got != want {
 		t.Errorf("ipv4WithOffset = %v, want %v", got, want)
