@@ -2,11 +2,12 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2019 Intel Corporation
 
+import ipaddress
 import os
 import socket
 import struct
 import sys
-from socket import AF_INET
+from socket import AF_INET, AF_INET6
 
 import iptools
 import psutil
@@ -70,6 +71,50 @@ def ips_by_interface(name: str) -> list[str]:
             if address["family"] == AF_INET:
                 return [address["local"]]
     return []
+
+
+def ip6s_by_interface(name: str) -> list[str]:
+    """The global IPv6 addresses of interface `name`: an N3/N9 tunnel is
+    never sent from a link-local one."""
+    ndb = NDB()
+    out = []
+    if iface_record := ndb.interfaces.get(name):
+        for address in iface_record.ipaddr:
+            if address["family"] != AF_INET6:
+                continue
+            if global_ipv6(address["address"]):
+                out.append(address["address"])
+    return out
+
+
+def global_ipv6(addr) -> bool:
+    try:
+        ip = ipaddress.IPv6Address(addr)
+    except ValueError:
+        return False
+    return not (
+        ip.is_link_local
+        or ip.is_multicast
+        or ip.is_loopback
+        or ip.is_unspecified
+        or ip.ipv4_mapped is not None
+    )
+
+
+def tunnel_ipv6(conf: dict, ifname: str) -> str | None:
+    """The IPv6 address GTP-U on this interface is sent from and received
+    on: the interface's "ipv6" key in upf.jsonc, else its first global IPv6
+    address, else none. "transport_family": "ipv4" turns it off."""
+    if conf.get("transport_family", "") == "ipv4":
+        return None
+    if explicit := conf.get("ipv6"):
+        if not global_ipv6(explicit):
+            raise ValueError(
+                f"{ifname}: ipv6 {explicit!r} is not a global IPv6 address"
+            )
+        return str(ipaddress.IPv6Address(explicit))
+    addrs = ip6s_by_interface(ifname)
+    return addrs[0] if addrs else None
 
 
 def atoh(ip):

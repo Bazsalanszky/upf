@@ -29,6 +29,7 @@ class GtpuEcho final : public Module {
 
  private:
   bool process_echo_request(bess::Packet *p);
+  bool process_echo_request6(bess::Packet *p);
   uint32_t s1u_sgw_ip = 0; /* S1U IP address */
 };
 /*----------------------------------------------------------------------------------*/

@@ -18,7 +18,9 @@ QFI = 9
 # BESS default batch size
 BATCH_SIZE = 64
 
-ETH = scapy.Ether(src="02:00:00:00:00:01", dst="02:00:00:00:00:02")
+# An IPv4 packet's frame: GtpuEncap sets the outer EtherType from the outer
+# header it builds (IPv4 here).
+ETH = scapy.Ether(src="02:00:00:00:00:01", dst="02:00:00:00:00:02", type=0x0800)
 ETH_LEN = len(bytes(ETH))
 IP_ID = slice(ETH_LEN + 4, ETH_LEN + 6)
 

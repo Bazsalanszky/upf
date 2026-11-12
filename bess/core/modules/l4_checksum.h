@@ -49,6 +49,7 @@ class L4Checksum final : public Module {
   void ProcessBatch(Context *ctx, bess::PacketBatch *batch) override;
 
  private:
+  gate_idx_t ProcessIpv6(bess::Packet *p);
   bool verify_;
   bool hw_;
 };

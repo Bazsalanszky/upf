@@ -5,14 +5,25 @@
 #ifndef BESS_MODULES_GTPUPARSER_H_
 #define BESS_MODULES_GTPUPARSER_H_
 /*----------------------------------------------------------------------------------*/
+#include <cstring>
+
 #include "../module.h"
 #include "gtpu_drop_log.h"
-/* for the IPv4 header */
+/* for the IPv4 and IPv6 headers */
 #include "utils/ip.h"
 /* for endian types */
 #include "utils/endian.h"
 using bess::utils::be16_t;
 using bess::utils::be32_t;
+/*----------------------------------------------------------------------------------*/
+/* The value pdrLookup's tunnel_ipv4_dst holds for a G-PDU in an IPv6 outer
+ * header: the low-order 32 bits of its destination address, in the byte
+ * order an IPv4 destination has there. See GtpuParser::ParseIpv6(). */
+static inline be32_t Ipv6TunnelKey(const bess::utils::Ipv6 &ip6h) {
+  be32_t key;
+  memcpy(&key, ip6h.dst + 12, sizeof(key));
+  return key;
+}
 /*----------------------------------------------------------------------------------*/
 /**
  * EPC Metadata
@@ -37,8 +48,9 @@ class GtpuParser final : public Module {
  private:
   gate_idx_t Parse(bess::Packet *p, const char **malformed);
   void set_unmatchable_attrs(bess::Packet *p);
-  gate_idx_t ParseGtpu(bess::Packet *p, bess::utils::Ipv4 *outer_iph,
-                       size_t gtp_off, const char **malformed);
+  gate_idx_t ParseIpv6(bess::Packet *p, const char **malformed);
+  gate_idx_t ParseGtpu(bess::Packet *p, be32_t tunnel_dst, size_t gtp_off,
+                       const char **malformed);
   GtpuDropLog drop_log_;
   /* set attributes */
   void set_gtp_parsing_attrs(be32_t *sip, be32_t *dip, be16_t *sp, be16_t *dp,

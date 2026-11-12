@@ -19,6 +19,12 @@ MAX_GATES = 8192
 MAX_ROUTE_RULES = 16384
 # Prefixes shorter than /24 need a tbl8; IPLookup's default is 128.
 MAX_ROUTE_TBL8S = 512
+# The IPv6 route table (IP6Lookup, rte_lpm6). A /128 neighbour route walks
+# the 24-bit first level and then one tbl8 group per further byte, 13 in
+# all, of which hosts in one /64 share the first five: a few new groups per
+# host, 1 KiB each. 8192 groups hold about a thousand neighbours.
+MAX_ROUTE6_RULES = 4096
+MAX_ROUTE6_TBL8S = 8192
 
 
 # ====================================================

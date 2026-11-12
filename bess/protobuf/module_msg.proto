@@ -162,6 +162,26 @@ message IPLookupCommandDeleteArg {
 message IPLookupCommandClearArg {}
 
 /**
+ * The IP6Lookup module has a command `add(...)`, as IPLookup has, for IPv6
+ * routes. A /0 route sets the default gate.
+ * Example use in bessctl: `table.add(prefix='2001:db8::', prefix_len=32,
+ * gate=2)`
+ */
+message IP6LookupCommandAddArg {
+  string prefix = 1;      /// The IPv6 network address of the prefix to match
+  uint64 prefix_len = 2;  /// The prefix length (0-128)
+  uint64 gate = 3;  /// The number of the gate to forward matching traffic on.
+}
+
+/**
+ * The IP6Lookup module has a command `delete(...)`, as IPLookup has.
+ */
+message IP6LookupCommandDeleteArg {
+  string prefix = 1;      /// The IPv6 network address of the prefix
+  uint64 prefix_len = 2;  /// The prefix length
+}
+
+/**
  * The L2Forward module forwards traffic via exact match over the Ethernet
  * destination address. The command `add(...)`  allows you to specifiy a
  * MAC address and which gate the L2Forward module should direct it out of.
@@ -683,6 +703,19 @@ message IPLookupArg {
 }
 
 /**
+ * An IP6Lookup module performs LPM lookups over the destination of IPv6
+ * packets (rte_lpm6). A packet that is not IPv6 or matches no route goes to
+ * the default gate, which a /0 route sets (default: drop).
+ *
+ * __Input Gates__: 1
+ * __Output Gates__: many (configurable, depending on rule values)
+ */
+message IP6LookupArg {
+  uint32 max_rules = 1;  /// Maximum number of rules (default: 1024)
+  uint32 max_tbl8s = 2;  /// Number of tbl8s to allocate (default: 1024)
+}
+
+/**
  * An L2Forward module forwards packets to an output gate according to
  * exact-match rules over an Ethernet destination. Note that this is _not_ a
  * learning switch -- forwards according to fixed routes specified by `add(..)`.
@@ -1116,6 +1149,8 @@ message L4ChecksumArg {
  */
 message GtpuEchoArg {
   uint32 s1u_sgw_ip = 1;  /// IP address of S1U interface
+  /// The access interface has IPv6 addresses; s1u_sgw_ip may then be 0 (none).
+  bool ipv6 = 2;
 }
 
 /**
@@ -1184,6 +1219,13 @@ message CounterArg {
  */
 message GtpuEncapArg {
   bool add_psc = 1;  /// Add PDU session container in encap (default = False)
+  /// The UPF's IPv6 addresses an IPv6 outer header is sent from: access for
+  /// downlink (action 0), core for uplink (action 1). Empty: no IPv6 outer
+  /// header in that direction. With either set, the module reads the IPv6
+  /// peer from the tunnel_out_dst_ip6_hi/lo attributes (8 bytes each, zero for
+  /// an IPv4 peer).
+  string access_ip6 = 2;
+  string core_ip6 = 3;
 }
 
 /**
@@ -1490,7 +1532,10 @@ message FlowMeasureFlipResponse {
  * This command add or deletes an IP address from the GtpuPathMonitoring module.
  */
 message GtpuPathMonitoringCommandAddDeleteArg {
-  uint32 gnb_ip = 1;  // The destination/gNB IP address.
+  uint32 gnb_ip = 1;  // The destination/gNB IPv4 address.
+  /// The gNB's IPv6 address, 16 bytes in network order. When set, gnb_ip is
+  /// ignored, and the gNB is sent the requests of an IPv6 template.
+  bytes gnb_ip6 = 2;
 }
 
 /**
@@ -1520,6 +1565,7 @@ message GtpuPathMonitoringCommandReadResponse {
     uint64 latency_min = 3;   /// minimum latency
     uint64 latency_mean = 4;  /// average latency
     uint64 latency_max = 5;   /// maximum latency
+    bytes gnb_ip6 = 6;        /// gNB IPv6 address (16 bytes), or empty
   }
   repeated Statistic statistics = 1;
 }

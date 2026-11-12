@@ -22,9 +22,11 @@
 #include "utils/format.h"
 #include <rte_jhash.h>
 /*----------------------------------------------------------------------------------*/
+using bess::utils::be16_t;
 using bess::utils::Ethernet;
 using bess::utils::Gtpv1;
 using bess::utils::Ipv4;
+using bess::utils::Ipv6;
 using bess::utils::Udp;
 /*----------------------------------------------------------------------------------*/
 void GtpuDecap::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
@@ -33,12 +35,12 @@ void GtpuDecap::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
   for (int i = 0; i < cnt; i++) {
     bess::Packet *p = batch->pkts()[i];
     const char *malformed = nullptr;
-    /* Trim the outer IPv4, UDP and GTP-U headers, keeping the Ethernet header:
-     * it is copied forward over the last bytes trimmed. The length is checked
-     * against the packet here rather than trusted to the parser, so a packet
-     * that does not hold its headers is dropped instead of being trimmed past
-     * its end. adj() refusing is the last guard: it checks only the bytes it
-     * removes, not the Ethernet header copied after them. */
+    /* Trim the outer IPv4 or IPv6, UDP and GTP-U headers, keeping the
+     * Ethernet header: it is copied forward over the last bytes trimmed. The
+     * length is checked against the packet here rather than trusted to the
+     * parser, so a packet that does not hold its headers is dropped instead of
+     * being trimmed past its end. adj() refusing is the last guard: it checks
+     * only the bytes it removes, not the Ethernet header copied after them. */
     size_t trim = OuterHeaderLength(p, &malformed);
     Ethernet *eth = p->head_data<Ethernet *>();
     void *new_p = malformed ? nullptr : p->adj(static_cast<uint16_t>(trim));
@@ -48,28 +50,70 @@ void GtpuDecap::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
       continue;
     }
     memcpy(new_p, eth, sizeof(*eth));
+    SetInnerEtherType(p);
     EmitPacket(ctx, p, 0);
   }
 }
 /*----------------------------------------------------------------------------------*/
-/* Length of the outer IPv4, UDP and GTP-U headers (with optional fields and
- * extension headers), if the first segment holds all of them after the
- * Ethernet header; otherwise 0, with the header that does not fit named in
+/* The Ethernet header kept from the outer packet names the outer family. The
+ * packet carried may be of the other one (an IPv4 packet in an IPv6 tunnel), so
+ * the EtherType is set from the inner header's version. Anything else is left
+ * as it was: the parser forwards only IP packets to decapsulation. */
+void GtpuDecap::SetInnerEtherType(bess::Packet *p) {
+  if (static_cast<size_t>(p->head_len()) <= sizeof(Ethernet)) {
+    return;
+  }
+  Ethernet *eth = p->head_data<Ethernet *>();
+  const uint8_t version = *(p->head_data<uint8_t *>() + sizeof(Ethernet)) >> 4;
+  if (version == 4) {
+    eth->ether_type = be16_t(Ethernet::kIpv4);
+  } else if (version == 6) {
+    eth->ether_type = be16_t(Ethernet::kIpv6);
+  }
+}
+/*----------------------------------------------------------------------------------*/
+/* Length of the outer IP header, IPv4 (with options) or IPv6 (the fixed header
+ * only: UDP must follow it), plus the UDP and GTP-U headers (with optional
+ * fields and extension headers), if the first segment holds all of them after
+ * the Ethernet header; otherwise 0, with the header that does not fit named in
  * `malformed`. */
 size_t GtpuDecap::OuterHeaderLength(bess::Packet *p, const char **malformed) {
   const size_t len = p->head_len();
   const char *head = p->head_data<const char *>();
 
   const size_t ip_off = sizeof(Ethernet);
-  if (len < ip_off + sizeof(Ipv4)) {
-    *malformed = "outer IPv4 header";
+  if (len < ip_off) {
+    *malformed = "Ethernet header";
     return 0;
   }
-  const Ipv4 *iph = reinterpret_cast<const Ipv4 *>(head + ip_off);
-  const size_t ihl = iph->header_length << 2;
-  if (ihl < sizeof(Ipv4) || ip_off + ihl + sizeof(Udp) > len) {
-    *malformed = "outer IPv4 or UDP header";
-    return 0;
+  const Ethernet *eth = reinterpret_cast<const Ethernet *>(head);
+  size_t ihl;
+  if (eth->ether_type == be16_t(Ethernet::kIpv6)) {
+    if (len < ip_off + sizeof(Ipv6)) {
+      *malformed = "outer IPv6 header";
+      return 0;
+    }
+    const Ipv6 *ip6h = reinterpret_cast<const Ipv6 *>(head + ip_off);
+    if (ip6h->next_header != Ipv4::kUdp) {
+      *malformed = "outer IPv6 next header";
+      return 0;
+    }
+    ihl = sizeof(Ipv6);
+    if (ip_off + ihl + sizeof(Udp) > len) {
+      *malformed = "outer IPv6 or UDP header";
+      return 0;
+    }
+  } else {
+    if (len < ip_off + sizeof(Ipv4)) {
+      *malformed = "outer IPv4 header";
+      return 0;
+    }
+    const Ipv4 *iph = reinterpret_cast<const Ipv4 *>(head + ip_off);
+    ihl = iph->header_length << 2;
+    if (ihl < sizeof(Ipv4) || ip_off + ihl + sizeof(Udp) > len) {
+      *malformed = "outer IPv4 or UDP header";
+      return 0;
+    }
   }
 
   const size_t gtp_off = ip_off + ihl + sizeof(Udp);
