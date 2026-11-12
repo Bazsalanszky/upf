@@ -133,10 +133,10 @@ NOT_IPV4_GPDU = {
     # Not a G-PDU, though its body would parse as the UE's IPv4 packet: only
     # the message type keeps it from being classified as user traffic.
     "end_marker_with_ipv4_body": n3(gtpu(0x30, 254, INNER_TCP)),
-    "ipv6_gpdu": n3(
-        gtpu(0x30, 0xFF, bytes(scapy.IPv6(src="fd00::1", dst="fd00::2") / scapy.UDP()))
-    ),
 }
+# A G-PDU carrying an IPv6 UE packet is classified for pdrLookup6, on gate 2
+# (gtpu_ue_ipv6.py), never as IPv4 user traffic.
+IPV6_GPDU = n3(gtpu(0x30, 0xFF, bytes(scapy.IPv6(src="fd00::1", dst="fd00::2") / scapy.UDP())))
 
 # Not GTP-U at all: handled exactly as before.
 OTHER = {
@@ -228,9 +228,12 @@ class GtpuDecapTest(BessModuleTestCase):
         for name, pkt in NOT_IPV4_GPDU.items():
             with self.subTest(case=name):
                 parser = GtpuParser()
-                out = self.run_module(parser, 0, [pkt], [0, 1])
+                out = self.run_module(parser, 0, [pkt], [0, 1, 2])
                 self.assertEqual(len(out[1]), 0, f"{name} was classified")
+                self.assertEqual(len(out[2]), 0, f"{name} was classified as IPv6")
                 self.assertEqual(len(out[0]), 1)
+        out = self.run_module(GtpuParser(), 0, [IPV6_GPDU], [0, 1, 2])
+        self.assertEqual((len(out[0]), len(out[1]), len(out[2])), (0, 0, 1), "the IPv6 G-PDU")
 
     def test_parser_keeps_other_frames_on_their_path(self):
         for name, pkt in OTHER.items():

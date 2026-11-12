@@ -40,8 +40,9 @@ class GtpuParser final : public Module {
  public:
   GtpuParser() { max_allowed_workers_ = Worker::kMaxWorkers; }
 
-  /* Gates: (0) Default, (1) Forward */
-  static const gate_idx_t kNumOGates = 2;
+  /* Gates: (0) Default, (1) Forward an IPv4 packet (pdrLookup), (2) Forward an
+   * IPv6 packet (pdrLookup6): an IPv6 UE packet, in a G-PDU or on its own. */
+  static const gate_idx_t kNumOGates = 3;
   CommandResponse Init(const bess::pb::EmptyArg &);
   void ProcessBatch(Context *ctx, bess::PacketBatch *batch) override;
 
@@ -51,6 +52,8 @@ class GtpuParser final : public Module {
   gate_idx_t ParseIpv6(bess::Packet *p, const char **malformed);
   gate_idx_t ParseGtpu(bess::Packet *p, be32_t tunnel_dst, size_t gtp_off,
                        const char **malformed);
+  gate_idx_t ClassifyIpv6(bess::Packet *p, size_t ip_off, be32_t teid,
+                          const char **malformed);
   GtpuDropLog drop_log_;
   /* set attributes */
   void set_gtp_parsing_attrs(be32_t *sip, be32_t *dip, be16_t *sp, be16_t *dp,
@@ -63,6 +66,12 @@ class GtpuParser final : public Module {
   int teid_id = -1;
   int tunnel_ip4_dst_id = -1;
   int proto_id = -1;
+  /* The IPv6 attributes pdrLookup6 matches on (see ClassifyIpv6()). */
+  int src_ip6_hi_id = -1;
+  int src_ip6_lo_id = -1;
+  int dst_ip6_hi_id = -1;
+  int dst_ip6_lo_id = -1;
+  int l4_ports_id = -1;
 };
 /*----------------------------------------------------------------------------------*/
 #endif  // BESS_MODULES_GTPUPARSER_H_
