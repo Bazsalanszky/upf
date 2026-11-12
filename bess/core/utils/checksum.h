@@ -39,6 +39,9 @@
 
 #include <x86intrin.h>
 
+#include <cstddef>
+#include <cstring>
+
 #include "common.h"
 #include "ip.h"
 #include "simd.h"
@@ -510,6 +513,86 @@ static inline uint16_t CalculateIpv4TcpChecksum(const Ipv4 &iph,
 
   return CalculateIpv4TcpChecksum(tcph, iph.src, iph.dst,
                                   ip_len - ip_header_len);
+}
+
+// IPv6 upper-layer checksums (RFC 8200 section 8.1). The pseudo header is the
+// two addresses, the upper-layer packet length and the next header value, so
+// these take the fixed header plus the upper-layer packet's own length and
+// protocol: any extension headers between them are not part of the sum.
+
+// 32-bit one's complement sum of the IPv6 pseudo header.
+static inline uint32_t Ipv6PseudoHeaderSum(const Ipv6 &iph, uint32_t l4_len,
+                                           uint8_t proto) {
+  uint64_t sum = CalculateSum(iph.src, sizeof(iph.src));
+  sum += CalculateSum(iph.dst, sizeof(iph.dst));
+  sum += be32_t(l4_len).raw_value();
+  sum += be32_t(proto).raw_value();
+  sum = (sum & 0xFFFFFFFF) + (sum >> 32);
+  sum = (sum & 0xFFFFFFFF) + (sum >> 32);
+  return static_cast<uint32_t>(sum);
+}
+
+// Adds two 32-bit one's complement sums.
+static inline uint32_t AddSum32(uint32_t a, uint32_t b) {
+  uint64_t sum = static_cast<uint64_t>(a) + b;
+  return static_cast<uint32_t>((sum & 0xFFFFFFFF) + (sum >> 32));
+}
+
+// The checksum of an upper-layer packet of `l4_len` bytes at `l4`, whose
+// checksum field is the 16-bit word at `cksum_off` (even), over IPv6. The
+// field's current value is left out of the sum. It does not write the field.
+static inline uint16_t CalculateIpv6L4Checksum(const Ipv6 &iph, const void *l4,
+                                               uint32_t l4_len, uint8_t proto,
+                                               size_t cksum_off) {
+  const uint8_t *buf = static_cast<const uint8_t *>(l4);
+  uint16_t field;
+  memcpy(&field, buf + cksum_off, sizeof(field));
+  uint32_t sum =
+      AddSum32(CalculateSum(buf, l4_len), static_cast<uint16_t>(~field));
+  return FoldChecksum(AddSum32(sum, Ipv6PseudoHeaderSum(iph, l4_len, proto)));
+}
+
+// Whether the checksum of an upper-layer packet over IPv6 is correct.
+static inline bool VerifyIpv6L4Checksum(const Ipv6 &iph, const void *l4,
+                                        uint32_t l4_len, uint8_t proto) {
+  uint32_t sum = AddSum32(CalculateSum(l4, l4_len),
+                          Ipv6PseudoHeaderSum(iph, l4_len, proto));
+  return FoldChecksum(sum) == 0;
+}
+
+// The UDP checksum over IPv6, of `udp_len` bytes (header and payload). A
+// computed 0 is sent as all ones (RFC 8200 section 8.1), since 0 is not a
+// valid checksum there.
+static inline uint16_t CalculateIpv6UdpChecksum(const Ipv6 &iph,
+                                                const Udp &udph,
+                                                uint32_t udp_len) {
+  return CalculateIpv6L4Checksum(iph, &udph, udp_len, Ipv4::Proto::kUdp,
+                                 offsetof(Udp, checksum))
+             ?: 0xFFFF;
+}
+
+// Whether the UDP checksum over IPv6 is correct. RFC 8200 makes a zero
+// checksum invalid, but RFC 6935 and RFC 6936 let a tunnel endpoint accept it
+// for tunnel protocols such as GTP-U, and some RANs send it: a zero checksum
+// is accepted, as it is over IPv4.
+static inline bool VerifyIpv6UdpChecksum(const Ipv6 &iph, const Udp &udph,
+                                         uint32_t udp_len) {
+  if (udph.checksum == 0) {
+    return true;
+  }
+  return VerifyIpv6L4Checksum(iph, &udph, udp_len, Ipv4::Proto::kUdp);
+}
+
+static inline uint16_t CalculateIpv6TcpChecksum(const Ipv6 &iph,
+                                                const Tcp &tcph,
+                                                uint32_t tcp_len) {
+  return CalculateIpv6L4Checksum(iph, &tcph, tcp_len, Ipv4::Proto::kTcp,
+                                 offsetof(Tcp, checksum));
+}
+
+static inline bool VerifyIpv6TcpChecksum(const Ipv6 &iph, const Tcp &tcph,
+                                         uint32_t tcp_len) {
+  return VerifyIpv6L4Checksum(iph, &tcph, tcp_len, Ipv4::Proto::kTcp);
 }
 
 // Incremental checksum update
