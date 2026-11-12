@@ -48,6 +48,13 @@ func NewIPPool(poolSubnet string) (*IPPool, error) {
 }
 
 func (i *IPPool) LookupOrAllocIP(seid uint64) (net.IP, error) {
+	// No pool means enable_ue_ip_alloc is off (see Release). A control plane that asks
+	// the UPF to choose an address anyway is refused, rather than taking the agent down.
+	if i == nil {
+		return nil, ErrOperationFailedWithReason("IP allocation",
+			"UE IP allocation is disabled (enable_ue_ip_alloc is false)")
+	}
+
 	i.mu.Lock()
 	defer i.mu.Unlock()
 
@@ -105,6 +112,10 @@ func (i *IPPool) Release(seid uint64) bool {
 }
 
 func (i *IPPool) String() string {
+	if i == nil {
+		return "no IP pool (UE IP allocation disabled)"
+	}
+
 	i.mu.Lock()
 	defer i.mu.Unlock()
 
