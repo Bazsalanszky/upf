@@ -41,9 +41,12 @@ type far struct {
 	applyAction   uint8
 	tunnelType    uint8
 	tunnelIPSrc   netip.Addr
-	tunnelIPDst   netip.Addr
-	tunnelTEID    uint32
-	tunnelPort    uint16
+	// tunnelIPDst is the peer the FAR's Outer Header Creation sends to. When the IE
+	// carries both an IPv4 and an IPv6 address the UP function picks one (TS 29.244 clause
+	// 8.2.56); this one picks IPv4, the family the datapath forwards.
+	tunnelIPDst netip.Addr
+	tunnelTEID  uint32
+	tunnelPort  uint16
 }
 
 func (f far) String() string {
@@ -92,6 +95,10 @@ func (f *far) parseFAR(farIE *ie.IE, fseid uint64, upf *upf, op operation) error
 
 			f.tunnelTEID = ohcFields.TEID
 			f.tunnelIPDst = addrFromIP(ohcFields.IPv4Address)
+			if !f.tunnelIPDst.IsValid() {
+				f.tunnelIPDst = addrFromIP(ohcFields.IPv6Address)
+			}
+
 			f.tunnelType = uint8(1) // Preserve the existing tunnel type encoding for GTP-U forwarding.
 			f.tunnelPort = tunnelGTPUPort
 		case ie.DestinationInterface:
@@ -122,6 +129,16 @@ func (f *far) parseFAR(farIE *ie.IE, fseid uint64, upf *upf, op operation) error
 				f.sendEndMarker = true
 			}
 		}
+	}
+
+	return f.checkDatapathSupport()
+}
+
+// checkDatapathSupport refuses a FAR whose tunnel the datapath cannot build: it
+// encapsulates in IPv4 only. See pdr.checkDatapathSupport for why here.
+func (f far) checkDatapathSupport() error {
+	if f.tunnelIPDst.IsValid() && !f.tunnelIPDst.Is4() {
+		return ErrUnsupported("FAR creating an IPv6 outer header to", f.tunnelIPDst)
 	}
 
 	return nil
