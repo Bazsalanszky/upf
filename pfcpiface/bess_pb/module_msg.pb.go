@@ -659,6 +659,127 @@ func (*IPLookupCommandClearArg) Descriptor() ([]byte, []int) {
 }
 
 // *
+// The IP6Lookup module has a command `add(...)`, as IPLookup has, for IPv6
+// routes. A /0 route sets the default gate.
+// Example use in bessctl: `table.add(prefix='2001:db8::', prefix_len=32,
+// gate=2)`
+type IP6LookupCommandAddArg struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Prefix        string                 `protobuf:"bytes,1,opt,name=prefix,proto3" json:"prefix,omitempty"`                         /// The IPv6 network address of the prefix to match
+	PrefixLen     uint64                 `protobuf:"varint,2,opt,name=prefix_len,json=prefixLen,proto3" json:"prefix_len,omitempty"` /// The prefix length (0-128)
+	Gate          uint64                 `protobuf:"varint,3,opt,name=gate,proto3" json:"gate,omitempty"`                            /// The number of the gate to forward matching traffic on.
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *IP6LookupCommandAddArg) Reset() {
+	*x = IP6LookupCommandAddArg{}
+	mi := &file_module_msg_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *IP6LookupCommandAddArg) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+// SONARQB: Empty protobuf generated method is safe to ignore
+func (*IP6LookupCommandAddArg) ProtoMessage() {}
+
+func (x *IP6LookupCommandAddArg) ProtoReflect() protoreflect.Message {
+	mi := &file_module_msg_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use IP6LookupCommandAddArg.ProtoReflect.Descriptor instead.
+func (*IP6LookupCommandAddArg) Descriptor() ([]byte, []int) {
+	return file_module_msg_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *IP6LookupCommandAddArg) GetPrefix() string {
+	if x != nil {
+		return x.Prefix
+	}
+	return ""
+}
+
+func (x *IP6LookupCommandAddArg) GetPrefixLen() uint64 {
+	if x != nil {
+		return x.PrefixLen
+	}
+	return 0
+}
+
+func (x *IP6LookupCommandAddArg) GetGate() uint64 {
+	if x != nil {
+		return x.Gate
+	}
+	return 0
+}
+
+// *
+// The IP6Lookup module has a command `delete(...)`, as IPLookup has.
+type IP6LookupCommandDeleteArg struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Prefix        string                 `protobuf:"bytes,1,opt,name=prefix,proto3" json:"prefix,omitempty"`                         /// The IPv6 network address of the prefix
+	PrefixLen     uint64                 `protobuf:"varint,2,opt,name=prefix_len,json=prefixLen,proto3" json:"prefix_len,omitempty"` /// The prefix length
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *IP6LookupCommandDeleteArg) Reset() {
+	*x = IP6LookupCommandDeleteArg{}
+	mi := &file_module_msg_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *IP6LookupCommandDeleteArg) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+// SONARQB: Empty protobuf generated method is safe to ignore
+func (*IP6LookupCommandDeleteArg) ProtoMessage() {}
+
+func (x *IP6LookupCommandDeleteArg) ProtoReflect() protoreflect.Message {
+	mi := &file_module_msg_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use IP6LookupCommandDeleteArg.ProtoReflect.Descriptor instead.
+func (*IP6LookupCommandDeleteArg) Descriptor() ([]byte, []int) {
+	return file_module_msg_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *IP6LookupCommandDeleteArg) GetPrefix() string {
+	if x != nil {
+		return x.Prefix
+	}
+	return ""
+}
+
+func (x *IP6LookupCommandDeleteArg) GetPrefixLen() uint64 {
+	if x != nil {
+		return x.PrefixLen
+	}
+	return 0
+}
+
+// *
 // The L2Forward module forwards traffic via exact match over the Ethernet
 // destination address. The command `add(...)`  allows you to specifiy a
 // MAC address and which gate the L2Forward module should direct it out of.
@@ -671,7 +792,7 @@ type L2ForwardCommandAddArg struct {
 
 func (x *L2ForwardCommandAddArg) Reset() {
 	*x = L2ForwardCommandAddArg{}
-	mi := &file_module_msg_proto_msgTypes[12]
+	mi := &file_module_msg_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -684,7 +805,7 @@ func (x *L2ForwardCommandAddArg) String() string {
 func (*L2ForwardCommandAddArg) ProtoMessage() {}
 
 func (x *L2ForwardCommandAddArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[12]
+	mi := &file_module_msg_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -697,7 +818,7 @@ func (x *L2ForwardCommandAddArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use L2ForwardCommandAddArg.ProtoReflect.Descriptor instead.
 func (*L2ForwardCommandAddArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{12}
+	return file_module_msg_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *L2ForwardCommandAddArg) GetEntries() []*L2ForwardCommandAddArg_Entry {
@@ -719,7 +840,7 @@ type L2ForwardCommandDeleteArg struct {
 
 func (x *L2ForwardCommandDeleteArg) Reset() {
 	*x = L2ForwardCommandDeleteArg{}
-	mi := &file_module_msg_proto_msgTypes[13]
+	mi := &file_module_msg_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -732,7 +853,7 @@ func (x *L2ForwardCommandDeleteArg) String() string {
 func (*L2ForwardCommandDeleteArg) ProtoMessage() {}
 
 func (x *L2ForwardCommandDeleteArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[13]
+	mi := &file_module_msg_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -745,7 +866,7 @@ func (x *L2ForwardCommandDeleteArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use L2ForwardCommandDeleteArg.ProtoReflect.Descriptor instead.
 func (*L2ForwardCommandDeleteArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{13}
+	return file_module_msg_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *L2ForwardCommandDeleteArg) GetAddrs() []string {
@@ -768,7 +889,7 @@ type L2ForwardCommandSetDefaultGateArg struct {
 
 func (x *L2ForwardCommandSetDefaultGateArg) Reset() {
 	*x = L2ForwardCommandSetDefaultGateArg{}
-	mi := &file_module_msg_proto_msgTypes[14]
+	mi := &file_module_msg_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -781,7 +902,7 @@ func (x *L2ForwardCommandSetDefaultGateArg) String() string {
 func (*L2ForwardCommandSetDefaultGateArg) ProtoMessage() {}
 
 func (x *L2ForwardCommandSetDefaultGateArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[14]
+	mi := &file_module_msg_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -794,7 +915,7 @@ func (x *L2ForwardCommandSetDefaultGateArg) ProtoReflect() protoreflect.Message 
 
 // Deprecated: Use L2ForwardCommandSetDefaultGateArg.ProtoReflect.Descriptor instead.
 func (*L2ForwardCommandSetDefaultGateArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{14}
+	return file_module_msg_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *L2ForwardCommandSetDefaultGateArg) GetGate() int64 {
@@ -816,7 +937,7 @@ type L2ForwardCommandLookupArg struct {
 
 func (x *L2ForwardCommandLookupArg) Reset() {
 	*x = L2ForwardCommandLookupArg{}
-	mi := &file_module_msg_proto_msgTypes[15]
+	mi := &file_module_msg_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -829,7 +950,7 @@ func (x *L2ForwardCommandLookupArg) String() string {
 func (*L2ForwardCommandLookupArg) ProtoMessage() {}
 
 func (x *L2ForwardCommandLookupArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[15]
+	mi := &file_module_msg_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -842,7 +963,7 @@ func (x *L2ForwardCommandLookupArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use L2ForwardCommandLookupArg.ProtoReflect.Descriptor instead.
 func (*L2ForwardCommandLookupArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{15}
+	return file_module_msg_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *L2ForwardCommandLookupArg) GetAddrs() []string {
@@ -865,7 +986,7 @@ type L2ForwardCommandLookupResponse struct {
 
 func (x *L2ForwardCommandLookupResponse) Reset() {
 	*x = L2ForwardCommandLookupResponse{}
-	mi := &file_module_msg_proto_msgTypes[16]
+	mi := &file_module_msg_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -878,7 +999,7 @@ func (x *L2ForwardCommandLookupResponse) String() string {
 func (*L2ForwardCommandLookupResponse) ProtoMessage() {}
 
 func (x *L2ForwardCommandLookupResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[16]
+	mi := &file_module_msg_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -891,7 +1012,7 @@ func (x *L2ForwardCommandLookupResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use L2ForwardCommandLookupResponse.ProtoReflect.Descriptor instead.
 func (*L2ForwardCommandLookupResponse) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{16}
+	return file_module_msg_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *L2ForwardCommandLookupResponse) GetGates() []uint64 {
@@ -921,7 +1042,7 @@ type L2ForwardCommandPopulateArg struct {
 
 func (x *L2ForwardCommandPopulateArg) Reset() {
 	*x = L2ForwardCommandPopulateArg{}
-	mi := &file_module_msg_proto_msgTypes[17]
+	mi := &file_module_msg_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -934,7 +1055,7 @@ func (x *L2ForwardCommandPopulateArg) String() string {
 func (*L2ForwardCommandPopulateArg) ProtoMessage() {}
 
 func (x *L2ForwardCommandPopulateArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[17]
+	mi := &file_module_msg_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -947,7 +1068,7 @@ func (x *L2ForwardCommandPopulateArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use L2ForwardCommandPopulateArg.ProtoReflect.Descriptor instead.
 func (*L2ForwardCommandPopulateArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{17}
+	return file_module_msg_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *L2ForwardCommandPopulateArg) GetBase() string {
@@ -990,7 +1111,7 @@ type MeasureCommandGetSummaryArg struct {
 
 func (x *MeasureCommandGetSummaryArg) Reset() {
 	*x = MeasureCommandGetSummaryArg{}
-	mi := &file_module_msg_proto_msgTypes[18]
+	mi := &file_module_msg_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1003,7 +1124,7 @@ func (x *MeasureCommandGetSummaryArg) String() string {
 func (*MeasureCommandGetSummaryArg) ProtoMessage() {}
 
 func (x *MeasureCommandGetSummaryArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[18]
+	mi := &file_module_msg_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1016,7 +1137,7 @@ func (x *MeasureCommandGetSummaryArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MeasureCommandGetSummaryArg.ProtoReflect.Descriptor instead.
 func (*MeasureCommandGetSummaryArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{18}
+	return file_module_msg_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *MeasureCommandGetSummaryArg) GetClear() bool {
@@ -1060,7 +1181,7 @@ type MeasureCommandGetSummaryResponse struct {
 
 func (x *MeasureCommandGetSummaryResponse) Reset() {
 	*x = MeasureCommandGetSummaryResponse{}
-	mi := &file_module_msg_proto_msgTypes[19]
+	mi := &file_module_msg_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1073,7 +1194,7 @@ func (x *MeasureCommandGetSummaryResponse) String() string {
 func (*MeasureCommandGetSummaryResponse) ProtoMessage() {}
 
 func (x *MeasureCommandGetSummaryResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[19]
+	mi := &file_module_msg_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1086,7 +1207,7 @@ func (x *MeasureCommandGetSummaryResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MeasureCommandGetSummaryResponse.ProtoReflect.Descriptor instead.
 func (*MeasureCommandGetSummaryResponse) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{19}
+	return file_module_msg_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *MeasureCommandGetSummaryResponse) GetTimestamp() float64 {
@@ -1142,7 +1263,7 @@ type DRRArg struct {
 
 func (x *DRRArg) Reset() {
 	*x = DRRArg{}
-	mi := &file_module_msg_proto_msgTypes[20]
+	mi := &file_module_msg_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1155,7 +1276,7 @@ func (x *DRRArg) String() string {
 func (*DRRArg) ProtoMessage() {}
 
 func (x *DRRArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[20]
+	mi := &file_module_msg_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1168,7 +1289,7 @@ func (x *DRRArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DRRArg.ProtoReflect.Descriptor instead.
 func (*DRRArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{20}
+	return file_module_msg_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *DRRArg) GetNumFlows() uint32 {
@@ -1203,7 +1324,7 @@ type DRRQuantumArg struct {
 
 func (x *DRRQuantumArg) Reset() {
 	*x = DRRQuantumArg{}
-	mi := &file_module_msg_proto_msgTypes[21]
+	mi := &file_module_msg_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1216,7 +1337,7 @@ func (x *DRRQuantumArg) String() string {
 func (*DRRQuantumArg) ProtoMessage() {}
 
 func (x *DRRQuantumArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[21]
+	mi := &file_module_msg_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1229,7 +1350,7 @@ func (x *DRRQuantumArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DRRQuantumArg.ProtoReflect.Descriptor instead.
 func (*DRRQuantumArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{21}
+	return file_module_msg_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *DRRQuantumArg) GetQuantum() uint32 {
@@ -1252,7 +1373,7 @@ type DRRMaxFlowQueueSizeArg struct {
 
 func (x *DRRMaxFlowQueueSizeArg) Reset() {
 	*x = DRRMaxFlowQueueSizeArg{}
-	mi := &file_module_msg_proto_msgTypes[22]
+	mi := &file_module_msg_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1265,7 +1386,7 @@ func (x *DRRMaxFlowQueueSizeArg) String() string {
 func (*DRRMaxFlowQueueSizeArg) ProtoMessage() {}
 
 func (x *DRRMaxFlowQueueSizeArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[22]
+	mi := &file_module_msg_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1278,7 +1399,7 @@ func (x *DRRMaxFlowQueueSizeArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DRRMaxFlowQueueSizeArg.ProtoReflect.Descriptor instead.
 func (*DRRMaxFlowQueueSizeArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{22}
+	return file_module_msg_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *DRRMaxFlowQueueSizeArg) GetMaxQueueSize() uint32 {
@@ -1301,7 +1422,7 @@ type PortIncCommandSetBurstArg struct {
 
 func (x *PortIncCommandSetBurstArg) Reset() {
 	*x = PortIncCommandSetBurstArg{}
-	mi := &file_module_msg_proto_msgTypes[23]
+	mi := &file_module_msg_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1314,7 +1435,7 @@ func (x *PortIncCommandSetBurstArg) String() string {
 func (*PortIncCommandSetBurstArg) ProtoMessage() {}
 
 func (x *PortIncCommandSetBurstArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[23]
+	mi := &file_module_msg_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1327,7 +1448,7 @@ func (x *PortIncCommandSetBurstArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PortIncCommandSetBurstArg.ProtoReflect.Descriptor instead.
 func (*PortIncCommandSetBurstArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{23}
+	return file_module_msg_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *PortIncCommandSetBurstArg) GetBurst() uint64 {
@@ -1350,7 +1471,7 @@ type QueueIncCommandSetBurstArg struct {
 
 func (x *QueueIncCommandSetBurstArg) Reset() {
 	*x = QueueIncCommandSetBurstArg{}
-	mi := &file_module_msg_proto_msgTypes[24]
+	mi := &file_module_msg_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1363,7 +1484,7 @@ func (x *QueueIncCommandSetBurstArg) String() string {
 func (*QueueIncCommandSetBurstArg) ProtoMessage() {}
 
 func (x *QueueIncCommandSetBurstArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[24]
+	mi := &file_module_msg_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1376,7 +1497,7 @@ func (x *QueueIncCommandSetBurstArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QueueIncCommandSetBurstArg.ProtoReflect.Descriptor instead.
 func (*QueueIncCommandSetBurstArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{24}
+	return file_module_msg_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *QueueIncCommandSetBurstArg) GetBurst() uint64 {
@@ -1399,7 +1520,7 @@ type QueueCommandSetBurstArg struct {
 
 func (x *QueueCommandSetBurstArg) Reset() {
 	*x = QueueCommandSetBurstArg{}
-	mi := &file_module_msg_proto_msgTypes[25]
+	mi := &file_module_msg_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1412,7 +1533,7 @@ func (x *QueueCommandSetBurstArg) String() string {
 func (*QueueCommandSetBurstArg) ProtoMessage() {}
 
 func (x *QueueCommandSetBurstArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[25]
+	mi := &file_module_msg_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1425,7 +1546,7 @@ func (x *QueueCommandSetBurstArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QueueCommandSetBurstArg.ProtoReflect.Descriptor instead.
 func (*QueueCommandSetBurstArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{25}
+	return file_module_msg_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *QueueCommandSetBurstArg) GetBurst() uint64 {
@@ -1447,7 +1568,7 @@ type QueueCommandSetSizeArg struct {
 
 func (x *QueueCommandSetSizeArg) Reset() {
 	*x = QueueCommandSetSizeArg{}
-	mi := &file_module_msg_proto_msgTypes[26]
+	mi := &file_module_msg_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1460,7 +1581,7 @@ func (x *QueueCommandSetSizeArg) String() string {
 func (*QueueCommandSetSizeArg) ProtoMessage() {}
 
 func (x *QueueCommandSetSizeArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[26]
+	mi := &file_module_msg_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1473,7 +1594,7 @@ func (x *QueueCommandSetSizeArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QueueCommandSetSizeArg.ProtoReflect.Descriptor instead.
 func (*QueueCommandSetSizeArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{26}
+	return file_module_msg_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *QueueCommandSetSizeArg) GetSize() uint64 {
@@ -1494,7 +1615,7 @@ type QueueCommandGetStatusArg struct {
 
 func (x *QueueCommandGetStatusArg) Reset() {
 	*x = QueueCommandGetStatusArg{}
-	mi := &file_module_msg_proto_msgTypes[27]
+	mi := &file_module_msg_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1507,7 +1628,7 @@ func (x *QueueCommandGetStatusArg) String() string {
 func (*QueueCommandGetStatusArg) ProtoMessage() {}
 
 func (x *QueueCommandGetStatusArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[27]
+	mi := &file_module_msg_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1520,7 +1641,7 @@ func (x *QueueCommandGetStatusArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QueueCommandGetStatusArg.ProtoReflect.Descriptor instead.
 func (*QueueCommandGetStatusArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{27}
+	return file_module_msg_proto_rawDescGZIP(), []int{29}
 }
 
 // *
@@ -1540,7 +1661,7 @@ type QueueCommandGetStatusResponse struct {
 
 func (x *QueueCommandGetStatusResponse) Reset() {
 	*x = QueueCommandGetStatusResponse{}
-	mi := &file_module_msg_proto_msgTypes[28]
+	mi := &file_module_msg_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1553,7 +1674,7 @@ func (x *QueueCommandGetStatusResponse) String() string {
 func (*QueueCommandGetStatusResponse) ProtoMessage() {}
 
 func (x *QueueCommandGetStatusResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[28]
+	mi := &file_module_msg_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1566,7 +1687,7 @@ func (x *QueueCommandGetStatusResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QueueCommandGetStatusResponse.ProtoReflect.Descriptor instead.
 func (*QueueCommandGetStatusResponse) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{28}
+	return file_module_msg_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *QueueCommandGetStatusResponse) GetCount() uint64 {
@@ -1615,7 +1736,7 @@ type RandomUpdateCommandClearArg struct {
 
 func (x *RandomUpdateCommandClearArg) Reset() {
 	*x = RandomUpdateCommandClearArg{}
-	mi := &file_module_msg_proto_msgTypes[29]
+	mi := &file_module_msg_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1628,7 +1749,7 @@ func (x *RandomUpdateCommandClearArg) String() string {
 func (*RandomUpdateCommandClearArg) ProtoMessage() {}
 
 func (x *RandomUpdateCommandClearArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[29]
+	mi := &file_module_msg_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1641,7 +1762,7 @@ func (x *RandomUpdateCommandClearArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RandomUpdateCommandClearArg.ProtoReflect.Descriptor instead.
 func (*RandomUpdateCommandClearArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{29}
+	return file_module_msg_proto_rawDescGZIP(), []int{31}
 }
 
 // *
@@ -1655,7 +1776,7 @@ type RewriteCommandClearArg struct {
 
 func (x *RewriteCommandClearArg) Reset() {
 	*x = RewriteCommandClearArg{}
-	mi := &file_module_msg_proto_msgTypes[30]
+	mi := &file_module_msg_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1668,7 +1789,7 @@ func (x *RewriteCommandClearArg) String() string {
 func (*RewriteCommandClearArg) ProtoMessage() {}
 
 func (x *RewriteCommandClearArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[30]
+	mi := &file_module_msg_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1681,7 +1802,7 @@ func (x *RewriteCommandClearArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RewriteCommandClearArg.ProtoReflect.Descriptor instead.
 func (*RewriteCommandClearArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{30}
+	return file_module_msg_proto_rawDescGZIP(), []int{32}
 }
 
 // *
@@ -1695,7 +1816,7 @@ type UpdateCommandClearArg struct {
 
 func (x *UpdateCommandClearArg) Reset() {
 	*x = UpdateCommandClearArg{}
-	mi := &file_module_msg_proto_msgTypes[31]
+	mi := &file_module_msg_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1708,7 +1829,7 @@ func (x *UpdateCommandClearArg) String() string {
 func (*UpdateCommandClearArg) ProtoMessage() {}
 
 func (x *UpdateCommandClearArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[31]
+	mi := &file_module_msg_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1721,7 +1842,7 @@ func (x *UpdateCommandClearArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateCommandClearArg.ProtoReflect.Descriptor instead.
 func (*UpdateCommandClearArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{31}
+	return file_module_msg_proto_rawDescGZIP(), []int{33}
 }
 
 // *
@@ -1743,7 +1864,7 @@ type WildcardMatchCommandAddArg struct {
 
 func (x *WildcardMatchCommandAddArg) Reset() {
 	*x = WildcardMatchCommandAddArg{}
-	mi := &file_module_msg_proto_msgTypes[32]
+	mi := &file_module_msg_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1756,7 +1877,7 @@ func (x *WildcardMatchCommandAddArg) String() string {
 func (*WildcardMatchCommandAddArg) ProtoMessage() {}
 
 func (x *WildcardMatchCommandAddArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[32]
+	mi := &file_module_msg_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1769,7 +1890,7 @@ func (x *WildcardMatchCommandAddArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WildcardMatchCommandAddArg.ProtoReflect.Descriptor instead.
 func (*WildcardMatchCommandAddArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{32}
+	return file_module_msg_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *WildcardMatchCommandAddArg) GetGate() uint64 {
@@ -1821,7 +1942,7 @@ type WildcardMatchCommandDeleteArg struct {
 
 func (x *WildcardMatchCommandDeleteArg) Reset() {
 	*x = WildcardMatchCommandDeleteArg{}
-	mi := &file_module_msg_proto_msgTypes[33]
+	mi := &file_module_msg_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1834,7 +1955,7 @@ func (x *WildcardMatchCommandDeleteArg) String() string {
 func (*WildcardMatchCommandDeleteArg) ProtoMessage() {}
 
 func (x *WildcardMatchCommandDeleteArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[33]
+	mi := &file_module_msg_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1847,7 +1968,7 @@ func (x *WildcardMatchCommandDeleteArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WildcardMatchCommandDeleteArg.ProtoReflect.Descriptor instead.
 func (*WildcardMatchCommandDeleteArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{33}
+	return file_module_msg_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *WildcardMatchCommandDeleteArg) GetValues() []*FieldData {
@@ -1876,7 +1997,7 @@ type WildcardMatchCommandClearArg struct {
 
 func (x *WildcardMatchCommandClearArg) Reset() {
 	*x = WildcardMatchCommandClearArg{}
-	mi := &file_module_msg_proto_msgTypes[34]
+	mi := &file_module_msg_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1889,7 +2010,7 @@ func (x *WildcardMatchCommandClearArg) String() string {
 func (*WildcardMatchCommandClearArg) ProtoMessage() {}
 
 func (x *WildcardMatchCommandClearArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[34]
+	mi := &file_module_msg_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1902,7 +2023,7 @@ func (x *WildcardMatchCommandClearArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WildcardMatchCommandClearArg.ProtoReflect.Descriptor instead.
 func (*WildcardMatchCommandClearArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{34}
+	return file_module_msg_proto_rawDescGZIP(), []int{36}
 }
 
 // *
@@ -1918,7 +2039,7 @@ type WildcardMatchCommandSetDefaultGateArg struct {
 
 func (x *WildcardMatchCommandSetDefaultGateArg) Reset() {
 	*x = WildcardMatchCommandSetDefaultGateArg{}
-	mi := &file_module_msg_proto_msgTypes[35]
+	mi := &file_module_msg_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1931,7 +2052,7 @@ func (x *WildcardMatchCommandSetDefaultGateArg) String() string {
 func (*WildcardMatchCommandSetDefaultGateArg) ProtoMessage() {}
 
 func (x *WildcardMatchCommandSetDefaultGateArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[35]
+	mi := &file_module_msg_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1944,7 +2065,7 @@ func (x *WildcardMatchCommandSetDefaultGateArg) ProtoReflect() protoreflect.Mess
 
 // Deprecated: Use WildcardMatchCommandSetDefaultGateArg.ProtoReflect.Descriptor instead.
 func (*WildcardMatchCommandSetDefaultGateArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{35}
+	return file_module_msg_proto_rawDescGZIP(), []int{37}
 }
 
 func (x *WildcardMatchCommandSetDefaultGateArg) GetGate() uint64 {
@@ -1971,7 +2092,7 @@ type ACLArg struct {
 
 func (x *ACLArg) Reset() {
 	*x = ACLArg{}
-	mi := &file_module_msg_proto_msgTypes[36]
+	mi := &file_module_msg_proto_msgTypes[38]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1984,7 +2105,7 @@ func (x *ACLArg) String() string {
 func (*ACLArg) ProtoMessage() {}
 
 func (x *ACLArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[36]
+	mi := &file_module_msg_proto_msgTypes[38]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1997,7 +2118,7 @@ func (x *ACLArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ACLArg.ProtoReflect.Descriptor instead.
 func (*ACLArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{36}
+	return file_module_msg_proto_rawDescGZIP(), []int{38}
 }
 
 func (x *ACLArg) GetRules() []*ACLArg_Rule {
@@ -2022,7 +2143,7 @@ type BPFArg struct {
 
 func (x *BPFArg) Reset() {
 	*x = BPFArg{}
-	mi := &file_module_msg_proto_msgTypes[37]
+	mi := &file_module_msg_proto_msgTypes[39]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2035,7 +2156,7 @@ func (x *BPFArg) String() string {
 func (*BPFArg) ProtoMessage() {}
 
 func (x *BPFArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[37]
+	mi := &file_module_msg_proto_msgTypes[39]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2048,7 +2169,7 @@ func (x *BPFArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BPFArg.ProtoReflect.Descriptor instead.
 func (*BPFArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{37}
+	return file_module_msg_proto_rawDescGZIP(), []int{39}
 }
 
 func (x *BPFArg) GetFilters() []*BPFArg_Filter {
@@ -2074,7 +2195,7 @@ type BufferArg struct {
 
 func (x *BufferArg) Reset() {
 	*x = BufferArg{}
-	mi := &file_module_msg_proto_msgTypes[38]
+	mi := &file_module_msg_proto_msgTypes[40]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2087,7 +2208,7 @@ func (x *BufferArg) String() string {
 func (*BufferArg) ProtoMessage() {}
 
 func (x *BufferArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[38]
+	mi := &file_module_msg_proto_msgTypes[40]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2100,7 +2221,7 @@ func (x *BufferArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BufferArg.ProtoReflect.Descriptor instead.
 func (*BufferArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{38}
+	return file_module_msg_proto_rawDescGZIP(), []int{40}
 }
 
 // *
@@ -2121,7 +2242,7 @@ type BypassArg struct {
 
 func (x *BypassArg) Reset() {
 	*x = BypassArg{}
-	mi := &file_module_msg_proto_msgTypes[39]
+	mi := &file_module_msg_proto_msgTypes[41]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2134,7 +2255,7 @@ func (x *BypassArg) String() string {
 func (*BypassArg) ProtoMessage() {}
 
 func (x *BypassArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[39]
+	mi := &file_module_msg_proto_msgTypes[41]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2147,7 +2268,7 @@ func (x *BypassArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BypassArg.ProtoReflect.Descriptor instead.
 func (*BypassArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{39}
+	return file_module_msg_proto_rawDescGZIP(), []int{41}
 }
 
 func (x *BypassArg) GetCyclesPerBatch() uint32 {
@@ -2187,7 +2308,7 @@ type DumpArg struct {
 
 func (x *DumpArg) Reset() {
 	*x = DumpArg{}
-	mi := &file_module_msg_proto_msgTypes[40]
+	mi := &file_module_msg_proto_msgTypes[42]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2200,7 +2321,7 @@ func (x *DumpArg) String() string {
 func (*DumpArg) ProtoMessage() {}
 
 func (x *DumpArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[40]
+	mi := &file_module_msg_proto_msgTypes[42]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2213,7 +2334,7 @@ func (x *DumpArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DumpArg.ProtoReflect.Descriptor instead.
 func (*DumpArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{40}
+	return file_module_msg_proto_rawDescGZIP(), []int{42}
 }
 
 func (x *DumpArg) GetInterval() float64 {
@@ -2240,7 +2361,7 @@ type EtherEncapArg struct {
 
 func (x *EtherEncapArg) Reset() {
 	*x = EtherEncapArg{}
-	mi := &file_module_msg_proto_msgTypes[41]
+	mi := &file_module_msg_proto_msgTypes[43]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2253,7 +2374,7 @@ func (x *EtherEncapArg) String() string {
 func (*EtherEncapArg) ProtoMessage() {}
 
 func (x *EtherEncapArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[41]
+	mi := &file_module_msg_proto_msgTypes[43]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2266,7 +2387,7 @@ func (x *EtherEncapArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EtherEncapArg.ProtoReflect.Descriptor instead.
 func (*EtherEncapArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{41}
+	return file_module_msg_proto_rawDescGZIP(), []int{43}
 }
 
 // *
@@ -2293,7 +2414,7 @@ type ExactMatchArg struct {
 
 func (x *ExactMatchArg) Reset() {
 	*x = ExactMatchArg{}
-	mi := &file_module_msg_proto_msgTypes[42]
+	mi := &file_module_msg_proto_msgTypes[44]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2306,7 +2427,7 @@ func (x *ExactMatchArg) String() string {
 func (*ExactMatchArg) ProtoMessage() {}
 
 func (x *ExactMatchArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[42]
+	mi := &file_module_msg_proto_msgTypes[44]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2319,7 +2440,7 @@ func (x *ExactMatchArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExactMatchArg.ProtoReflect.Descriptor instead.
 func (*ExactMatchArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{42}
+	return file_module_msg_proto_rawDescGZIP(), []int{44}
 }
 
 func (x *ExactMatchArg) GetFields() []*Field {
@@ -2371,7 +2492,7 @@ type ExactMatchConfig struct {
 
 func (x *ExactMatchConfig) Reset() {
 	*x = ExactMatchConfig{}
-	mi := &file_module_msg_proto_msgTypes[43]
+	mi := &file_module_msg_proto_msgTypes[45]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2384,7 +2505,7 @@ func (x *ExactMatchConfig) String() string {
 func (*ExactMatchConfig) ProtoMessage() {}
 
 func (x *ExactMatchConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[43]
+	mi := &file_module_msg_proto_msgTypes[45]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2397,7 +2518,7 @@ func (x *ExactMatchConfig) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExactMatchConfig.ProtoReflect.Descriptor instead.
 func (*ExactMatchConfig) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{43}
+	return file_module_msg_proto_rawDescGZIP(), []int{45}
 }
 
 func (x *ExactMatchConfig) GetDefaultGate() uint64 {
@@ -2455,7 +2576,7 @@ type FlowGenArg struct {
 
 func (x *FlowGenArg) Reset() {
 	*x = FlowGenArg{}
-	mi := &file_module_msg_proto_msgTypes[44]
+	mi := &file_module_msg_proto_msgTypes[46]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2468,7 +2589,7 @@ func (x *FlowGenArg) String() string {
 func (*FlowGenArg) ProtoMessage() {}
 
 func (x *FlowGenArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[44]
+	mi := &file_module_msg_proto_msgTypes[46]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2481,7 +2602,7 @@ func (x *FlowGenArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FlowGenArg.ProtoReflect.Descriptor instead.
 func (*FlowGenArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{44}
+	return file_module_msg_proto_rawDescGZIP(), []int{46}
 }
 
 func (x *FlowGenArg) GetTemplate() []byte {
@@ -2575,7 +2696,7 @@ type GenericDecapArg struct {
 
 func (x *GenericDecapArg) Reset() {
 	*x = GenericDecapArg{}
-	mi := &file_module_msg_proto_msgTypes[45]
+	mi := &file_module_msg_proto_msgTypes[47]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2588,7 +2709,7 @@ func (x *GenericDecapArg) String() string {
 func (*GenericDecapArg) ProtoMessage() {}
 
 func (x *GenericDecapArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[45]
+	mi := &file_module_msg_proto_msgTypes[47]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2601,7 +2722,7 @@ func (x *GenericDecapArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GenericDecapArg.ProtoReflect.Descriptor instead.
 func (*GenericDecapArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{45}
+	return file_module_msg_proto_rawDescGZIP(), []int{47}
 }
 
 func (x *GenericDecapArg) GetBytes() uint64 {
@@ -2642,7 +2763,7 @@ type GenericEncapArg struct {
 
 func (x *GenericEncapArg) Reset() {
 	*x = GenericEncapArg{}
-	mi := &file_module_msg_proto_msgTypes[46]
+	mi := &file_module_msg_proto_msgTypes[48]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2655,7 +2776,7 @@ func (x *GenericEncapArg) String() string {
 func (*GenericEncapArg) ProtoMessage() {}
 
 func (x *GenericEncapArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[46]
+	mi := &file_module_msg_proto_msgTypes[48]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2668,7 +2789,7 @@ func (x *GenericEncapArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GenericEncapArg.ProtoReflect.Descriptor instead.
 func (*GenericEncapArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{46}
+	return file_module_msg_proto_rawDescGZIP(), []int{48}
 }
 
 func (x *GenericEncapArg) GetFields() []*GenericEncapArg_EncapField {
@@ -2696,7 +2817,7 @@ type HashLBArg struct {
 
 func (x *HashLBArg) Reset() {
 	*x = HashLBArg{}
-	mi := &file_module_msg_proto_msgTypes[47]
+	mi := &file_module_msg_proto_msgTypes[49]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2709,7 +2830,7 @@ func (x *HashLBArg) String() string {
 func (*HashLBArg) ProtoMessage() {}
 
 func (x *HashLBArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[47]
+	mi := &file_module_msg_proto_msgTypes[49]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2722,7 +2843,7 @@ func (x *HashLBArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HashLBArg.ProtoReflect.Descriptor instead.
 func (*HashLBArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{47}
+	return file_module_msg_proto_rawDescGZIP(), []int{49}
 }
 
 func (x *HashLBArg) GetGates() []int64 {
@@ -2761,7 +2882,7 @@ type IPEncapArg struct {
 
 func (x *IPEncapArg) Reset() {
 	*x = IPEncapArg{}
-	mi := &file_module_msg_proto_msgTypes[48]
+	mi := &file_module_msg_proto_msgTypes[50]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2774,7 +2895,7 @@ func (x *IPEncapArg) String() string {
 func (*IPEncapArg) ProtoMessage() {}
 
 func (x *IPEncapArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[48]
+	mi := &file_module_msg_proto_msgTypes[50]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2787,7 +2908,7 @@ func (x *IPEncapArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IPEncapArg.ProtoReflect.Descriptor instead.
 func (*IPEncapArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{48}
+	return file_module_msg_proto_rawDescGZIP(), []int{50}
 }
 
 // *
@@ -2807,7 +2928,7 @@ type IPLookupArg struct {
 
 func (x *IPLookupArg) Reset() {
 	*x = IPLookupArg{}
-	mi := &file_module_msg_proto_msgTypes[49]
+	mi := &file_module_msg_proto_msgTypes[51]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2820,7 +2941,7 @@ func (x *IPLookupArg) String() string {
 func (*IPLookupArg) ProtoMessage() {}
 
 func (x *IPLookupArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[49]
+	mi := &file_module_msg_proto_msgTypes[51]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2833,7 +2954,7 @@ func (x *IPLookupArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IPLookupArg.ProtoReflect.Descriptor instead.
 func (*IPLookupArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{49}
+	return file_module_msg_proto_rawDescGZIP(), []int{51}
 }
 
 func (x *IPLookupArg) GetMaxRules() uint32 {
@@ -2844,6 +2965,66 @@ func (x *IPLookupArg) GetMaxRules() uint32 {
 }
 
 func (x *IPLookupArg) GetMaxTbl8S() uint32 {
+	if x != nil {
+		return x.MaxTbl8S
+	}
+	return 0
+}
+
+// *
+// An IP6Lookup module performs LPM lookups over the destination of IPv6
+// packets (rte_lpm6). A packet that is not IPv6 or matches no route goes to
+// the default gate, which a /0 route sets (default: drop).
+//
+// __Input Gates__: 1
+// __Output Gates__: many (configurable, depending on rule values)
+type IP6LookupArg struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	MaxRules      uint32                 `protobuf:"varint,1,opt,name=max_rules,json=maxRules,proto3" json:"max_rules,omitempty"` /// Maximum number of rules (default: 1024)
+	MaxTbl8S      uint32                 `protobuf:"varint,2,opt,name=max_tbl8s,json=maxTbl8s,proto3" json:"max_tbl8s,omitempty"` /// Number of tbl8s to allocate (default: 1024)
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *IP6LookupArg) Reset() {
+	*x = IP6LookupArg{}
+	mi := &file_module_msg_proto_msgTypes[52]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *IP6LookupArg) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+// SONARQB: Empty protobuf generated method is safe to ignore
+func (*IP6LookupArg) ProtoMessage() {}
+
+func (x *IP6LookupArg) ProtoReflect() protoreflect.Message {
+	mi := &file_module_msg_proto_msgTypes[52]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use IP6LookupArg.ProtoReflect.Descriptor instead.
+func (*IP6LookupArg) Descriptor() ([]byte, []int) {
+	return file_module_msg_proto_rawDescGZIP(), []int{52}
+}
+
+func (x *IP6LookupArg) GetMaxRules() uint32 {
+	if x != nil {
+		return x.MaxRules
+	}
+	return 0
+}
+
+func (x *IP6LookupArg) GetMaxTbl8S() uint32 {
 	if x != nil {
 		return x.MaxTbl8S
 	}
@@ -2868,7 +3049,7 @@ type L2ForwardArg struct {
 
 func (x *L2ForwardArg) Reset() {
 	*x = L2ForwardArg{}
-	mi := &file_module_msg_proto_msgTypes[50]
+	mi := &file_module_msg_proto_msgTypes[53]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2881,7 +3062,7 @@ func (x *L2ForwardArg) String() string {
 func (*L2ForwardArg) ProtoMessage() {}
 
 func (x *L2ForwardArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[50]
+	mi := &file_module_msg_proto_msgTypes[53]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2894,7 +3075,7 @@ func (x *L2ForwardArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use L2ForwardArg.ProtoReflect.Descriptor instead.
 func (*L2ForwardArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{50}
+	return file_module_msg_proto_rawDescGZIP(), []int{53}
 }
 
 func (x *L2ForwardArg) GetSize() int64 {
@@ -2925,7 +3106,7 @@ type MACSwapArg struct {
 
 func (x *MACSwapArg) Reset() {
 	*x = MACSwapArg{}
-	mi := &file_module_msg_proto_msgTypes[51]
+	mi := &file_module_msg_proto_msgTypes[54]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2938,7 +3119,7 @@ func (x *MACSwapArg) String() string {
 func (*MACSwapArg) ProtoMessage() {}
 
 func (x *MACSwapArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[51]
+	mi := &file_module_msg_proto_msgTypes[54]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2951,7 +3132,7 @@ func (x *MACSwapArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MACSwapArg.ProtoReflect.Descriptor instead.
 func (*MACSwapArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{51}
+	return file_module_msg_proto_rawDescGZIP(), []int{54}
 }
 
 // *
@@ -2984,7 +3165,7 @@ type MeasureArg struct {
 
 func (x *MeasureArg) Reset() {
 	*x = MeasureArg{}
-	mi := &file_module_msg_proto_msgTypes[52]
+	mi := &file_module_msg_proto_msgTypes[55]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2997,7 +3178,7 @@ func (x *MeasureArg) String() string {
 func (*MeasureArg) ProtoMessage() {}
 
 func (x *MeasureArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[52]
+	mi := &file_module_msg_proto_msgTypes[55]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3010,7 +3191,7 @@ func (x *MeasureArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MeasureArg.ProtoReflect.Descriptor instead.
 func (*MeasureArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{52}
+	return file_module_msg_proto_rawDescGZIP(), []int{55}
 }
 
 func (x *MeasureArg) GetType() isMeasureArg_Type {
@@ -3092,7 +3273,7 @@ type MergeArg struct {
 
 func (x *MergeArg) Reset() {
 	*x = MergeArg{}
-	mi := &file_module_msg_proto_msgTypes[53]
+	mi := &file_module_msg_proto_msgTypes[56]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3105,7 +3286,7 @@ func (x *MergeArg) String() string {
 func (*MergeArg) ProtoMessage() {}
 
 func (x *MergeArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[53]
+	mi := &file_module_msg_proto_msgTypes[56]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3118,7 +3299,7 @@ func (x *MergeArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MergeArg.ProtoReflect.Descriptor instead.
 func (*MergeArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{53}
+	return file_module_msg_proto_rawDescGZIP(), []int{56}
 }
 
 // *
@@ -3134,7 +3315,7 @@ type MetadataTestArg struct {
 
 func (x *MetadataTestArg) Reset() {
 	*x = MetadataTestArg{}
-	mi := &file_module_msg_proto_msgTypes[54]
+	mi := &file_module_msg_proto_msgTypes[57]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3147,7 +3328,7 @@ func (x *MetadataTestArg) String() string {
 func (*MetadataTestArg) ProtoMessage() {}
 
 func (x *MetadataTestArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[54]
+	mi := &file_module_msg_proto_msgTypes[57]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3160,7 +3341,7 @@ func (x *MetadataTestArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MetadataTestArg.ProtoReflect.Descriptor instead.
 func (*MetadataTestArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{54}
+	return file_module_msg_proto_rawDescGZIP(), []int{57}
 }
 
 func (x *MetadataTestArg) GetRead() map[string]int64 {
@@ -3207,7 +3388,7 @@ type NATArg struct {
 
 func (x *NATArg) Reset() {
 	*x = NATArg{}
-	mi := &file_module_msg_proto_msgTypes[55]
+	mi := &file_module_msg_proto_msgTypes[58]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3220,7 +3401,7 @@ func (x *NATArg) String() string {
 func (*NATArg) ProtoMessage() {}
 
 func (x *NATArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[55]
+	mi := &file_module_msg_proto_msgTypes[58]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3233,7 +3414,7 @@ func (x *NATArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NATArg.ProtoReflect.Descriptor instead.
 func (*NATArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{55}
+	return file_module_msg_proto_rawDescGZIP(), []int{58}
 }
 
 func (x *NATArg) GetExtAddrs() []*NATArg_ExternalAddress {
@@ -3273,7 +3454,7 @@ type StaticNATArg struct {
 
 func (x *StaticNATArg) Reset() {
 	*x = StaticNATArg{}
-	mi := &file_module_msg_proto_msgTypes[56]
+	mi := &file_module_msg_proto_msgTypes[59]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3286,7 +3467,7 @@ func (x *StaticNATArg) String() string {
 func (*StaticNATArg) ProtoMessage() {}
 
 func (x *StaticNATArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[56]
+	mi := &file_module_msg_proto_msgTypes[59]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3299,7 +3480,7 @@ func (x *StaticNATArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StaticNATArg.ProtoReflect.Descriptor instead.
 func (*StaticNATArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{56}
+	return file_module_msg_proto_rawDescGZIP(), []int{59}
 }
 
 func (x *StaticNATArg) GetPairs() []*StaticNATArg_AddressRangePair {
@@ -3319,7 +3500,7 @@ type NoOpArg struct {
 
 func (x *NoOpArg) Reset() {
 	*x = NoOpArg{}
-	mi := &file_module_msg_proto_msgTypes[57]
+	mi := &file_module_msg_proto_msgTypes[60]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3332,7 +3513,7 @@ func (x *NoOpArg) String() string {
 func (*NoOpArg) ProtoMessage() {}
 
 func (x *NoOpArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[57]
+	mi := &file_module_msg_proto_msgTypes[60]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3345,7 +3526,7 @@ func (x *NoOpArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NoOpArg.ProtoReflect.Descriptor instead.
 func (*NoOpArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{57}
+	return file_module_msg_proto_rawDescGZIP(), []int{60}
 }
 
 // *
@@ -3366,7 +3547,7 @@ type PortIncArg struct {
 
 func (x *PortIncArg) Reset() {
 	*x = PortIncArg{}
-	mi := &file_module_msg_proto_msgTypes[58]
+	mi := &file_module_msg_proto_msgTypes[61]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3379,7 +3560,7 @@ func (x *PortIncArg) String() string {
 func (*PortIncArg) ProtoMessage() {}
 
 func (x *PortIncArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[58]
+	mi := &file_module_msg_proto_msgTypes[61]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3392,7 +3573,7 @@ func (x *PortIncArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PortIncArg.ProtoReflect.Descriptor instead.
 func (*PortIncArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{58}
+	return file_module_msg_proto_rawDescGZIP(), []int{61}
 }
 
 func (x *PortIncArg) GetPort() string {
@@ -3425,7 +3606,7 @@ type PortOutArg struct {
 
 func (x *PortOutArg) Reset() {
 	*x = PortOutArg{}
-	mi := &file_module_msg_proto_msgTypes[59]
+	mi := &file_module_msg_proto_msgTypes[62]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3438,7 +3619,7 @@ func (x *PortOutArg) String() string {
 func (*PortOutArg) ProtoMessage() {}
 
 func (x *PortOutArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[59]
+	mi := &file_module_msg_proto_msgTypes[62]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3451,7 +3632,7 @@ func (x *PortOutArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PortOutArg.ProtoReflect.Descriptor instead.
 func (*PortOutArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{59}
+	return file_module_msg_proto_rawDescGZIP(), []int{62}
 }
 
 func (x *PortOutArg) GetPort() string {
@@ -3480,7 +3661,7 @@ type QueueIncArg struct {
 
 func (x *QueueIncArg) Reset() {
 	*x = QueueIncArg{}
-	mi := &file_module_msg_proto_msgTypes[60]
+	mi := &file_module_msg_proto_msgTypes[63]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3493,7 +3674,7 @@ func (x *QueueIncArg) String() string {
 func (*QueueIncArg) ProtoMessage() {}
 
 func (x *QueueIncArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[60]
+	mi := &file_module_msg_proto_msgTypes[63]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3506,7 +3687,7 @@ func (x *QueueIncArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QueueIncArg.ProtoReflect.Descriptor instead.
 func (*QueueIncArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{60}
+	return file_module_msg_proto_rawDescGZIP(), []int{63}
 }
 
 func (x *QueueIncArg) GetPort() string {
@@ -3548,7 +3729,7 @@ type QueueOutArg struct {
 
 func (x *QueueOutArg) Reset() {
 	*x = QueueOutArg{}
-	mi := &file_module_msg_proto_msgTypes[61]
+	mi := &file_module_msg_proto_msgTypes[64]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3561,7 +3742,7 @@ func (x *QueueOutArg) String() string {
 func (*QueueOutArg) ProtoMessage() {}
 
 func (x *QueueOutArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[61]
+	mi := &file_module_msg_proto_msgTypes[64]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3574,7 +3755,7 @@ func (x *QueueOutArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QueueOutArg.ProtoReflect.Descriptor instead.
 func (*QueueOutArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{61}
+	return file_module_msg_proto_rawDescGZIP(), []int{64}
 }
 
 func (x *QueueOutArg) GetPort() string {
@@ -3609,7 +3790,7 @@ type QueueArg struct {
 
 func (x *QueueArg) Reset() {
 	*x = QueueArg{}
-	mi := &file_module_msg_proto_msgTypes[62]
+	mi := &file_module_msg_proto_msgTypes[65]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3622,7 +3803,7 @@ func (x *QueueArg) String() string {
 func (*QueueArg) ProtoMessage() {}
 
 func (x *QueueArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[62]
+	mi := &file_module_msg_proto_msgTypes[65]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3635,7 +3816,7 @@ func (x *QueueArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QueueArg.ProtoReflect.Descriptor instead.
 func (*QueueArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{62}
+	return file_module_msg_proto_rawDescGZIP(), []int{65}
 }
 
 func (x *QueueArg) GetSize() uint64 {
@@ -3674,7 +3855,7 @@ type RandomSplitArg struct {
 
 func (x *RandomSplitArg) Reset() {
 	*x = RandomSplitArg{}
-	mi := &file_module_msg_proto_msgTypes[63]
+	mi := &file_module_msg_proto_msgTypes[66]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3687,7 +3868,7 @@ func (x *RandomSplitArg) String() string {
 func (*RandomSplitArg) ProtoMessage() {}
 
 func (x *RandomSplitArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[63]
+	mi := &file_module_msg_proto_msgTypes[66]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3700,7 +3881,7 @@ func (x *RandomSplitArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RandomSplitArg.ProtoReflect.Descriptor instead.
 func (*RandomSplitArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{63}
+	return file_module_msg_proto_rawDescGZIP(), []int{66}
 }
 
 func (x *RandomSplitArg) GetDropRate() float64 {
@@ -3729,7 +3910,7 @@ type RandomSplitCommandSetDroprateArg struct {
 
 func (x *RandomSplitCommandSetDroprateArg) Reset() {
 	*x = RandomSplitCommandSetDroprateArg{}
-	mi := &file_module_msg_proto_msgTypes[64]
+	mi := &file_module_msg_proto_msgTypes[67]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3742,7 +3923,7 @@ func (x *RandomSplitCommandSetDroprateArg) String() string {
 func (*RandomSplitCommandSetDroprateArg) ProtoMessage() {}
 
 func (x *RandomSplitCommandSetDroprateArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[64]
+	mi := &file_module_msg_proto_msgTypes[67]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3755,7 +3936,7 @@ func (x *RandomSplitCommandSetDroprateArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RandomSplitCommandSetDroprateArg.ProtoReflect.Descriptor instead.
 func (*RandomSplitCommandSetDroprateArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{64}
+	return file_module_msg_proto_rawDescGZIP(), []int{67}
 }
 
 func (x *RandomSplitCommandSetDroprateArg) GetDropRate() float64 {
@@ -3777,7 +3958,7 @@ type RandomSplitCommandSetGatesArg struct {
 
 func (x *RandomSplitCommandSetGatesArg) Reset() {
 	*x = RandomSplitCommandSetGatesArg{}
-	mi := &file_module_msg_proto_msgTypes[65]
+	mi := &file_module_msg_proto_msgTypes[68]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3790,7 +3971,7 @@ func (x *RandomSplitCommandSetGatesArg) String() string {
 func (*RandomSplitCommandSetGatesArg) ProtoMessage() {}
 
 func (x *RandomSplitCommandSetGatesArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[65]
+	mi := &file_module_msg_proto_msgTypes[68]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3803,7 +3984,7 @@ func (x *RandomSplitCommandSetGatesArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RandomSplitCommandSetGatesArg.ProtoReflect.Descriptor instead.
 func (*RandomSplitCommandSetGatesArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{65}
+	return file_module_msg_proto_rawDescGZIP(), []int{68}
 }
 
 func (x *RandomSplitCommandSetGatesArg) GetGates() []int64 {
@@ -3828,7 +4009,7 @@ type RandomUpdateArg struct {
 
 func (x *RandomUpdateArg) Reset() {
 	*x = RandomUpdateArg{}
-	mi := &file_module_msg_proto_msgTypes[66]
+	mi := &file_module_msg_proto_msgTypes[69]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3841,7 +4022,7 @@ func (x *RandomUpdateArg) String() string {
 func (*RandomUpdateArg) ProtoMessage() {}
 
 func (x *RandomUpdateArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[66]
+	mi := &file_module_msg_proto_msgTypes[69]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3854,7 +4035,7 @@ func (x *RandomUpdateArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RandomUpdateArg.ProtoReflect.Descriptor instead.
 func (*RandomUpdateArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{66}
+	return file_module_msg_proto_rawDescGZIP(), []int{69}
 }
 
 func (x *RandomUpdateArg) GetFields() []*RandomUpdateArg_Field {
@@ -3880,7 +4061,7 @@ type RewriteArg struct {
 
 func (x *RewriteArg) Reset() {
 	*x = RewriteArg{}
-	mi := &file_module_msg_proto_msgTypes[67]
+	mi := &file_module_msg_proto_msgTypes[70]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3893,7 +4074,7 @@ func (x *RewriteArg) String() string {
 func (*RewriteArg) ProtoMessage() {}
 
 func (x *RewriteArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[67]
+	mi := &file_module_msg_proto_msgTypes[70]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3906,7 +4087,7 @@ func (x *RewriteArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RewriteArg.ProtoReflect.Descriptor instead.
 func (*RewriteArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{67}
+	return file_module_msg_proto_rawDescGZIP(), []int{70}
 }
 
 func (x *RewriteArg) GetTemplates() [][]byte {
@@ -3928,7 +4109,7 @@ type RoundRobinCommandSetGatesArg struct {
 
 func (x *RoundRobinCommandSetGatesArg) Reset() {
 	*x = RoundRobinCommandSetGatesArg{}
-	mi := &file_module_msg_proto_msgTypes[68]
+	mi := &file_module_msg_proto_msgTypes[71]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3941,7 +4122,7 @@ func (x *RoundRobinCommandSetGatesArg) String() string {
 func (*RoundRobinCommandSetGatesArg) ProtoMessage() {}
 
 func (x *RoundRobinCommandSetGatesArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[68]
+	mi := &file_module_msg_proto_msgTypes[71]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3954,7 +4135,7 @@ func (x *RoundRobinCommandSetGatesArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RoundRobinCommandSetGatesArg.ProtoReflect.Descriptor instead.
 func (*RoundRobinCommandSetGatesArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{68}
+	return file_module_msg_proto_rawDescGZIP(), []int{71}
 }
 
 func (x *RoundRobinCommandSetGatesArg) GetGates() []int64 {
@@ -3976,7 +4157,7 @@ type RoundRobinCommandSetModeArg struct {
 
 func (x *RoundRobinCommandSetModeArg) Reset() {
 	*x = RoundRobinCommandSetModeArg{}
-	mi := &file_module_msg_proto_msgTypes[69]
+	mi := &file_module_msg_proto_msgTypes[72]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3989,7 +4170,7 @@ func (x *RoundRobinCommandSetModeArg) String() string {
 func (*RoundRobinCommandSetModeArg) ProtoMessage() {}
 
 func (x *RoundRobinCommandSetModeArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[69]
+	mi := &file_module_msg_proto_msgTypes[72]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4002,7 +4183,7 @@ func (x *RoundRobinCommandSetModeArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RoundRobinCommandSetModeArg.ProtoReflect.Descriptor instead.
 func (*RoundRobinCommandSetModeArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{69}
+	return file_module_msg_proto_rawDescGZIP(), []int{72}
 }
 
 func (x *RoundRobinCommandSetModeArg) GetMode() string {
@@ -4028,7 +4209,7 @@ type RoundRobinArg struct {
 
 func (x *RoundRobinArg) Reset() {
 	*x = RoundRobinArg{}
-	mi := &file_module_msg_proto_msgTypes[70]
+	mi := &file_module_msg_proto_msgTypes[73]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4041,7 +4222,7 @@ func (x *RoundRobinArg) String() string {
 func (*RoundRobinArg) ProtoMessage() {}
 
 func (x *RoundRobinArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[70]
+	mi := &file_module_msg_proto_msgTypes[73]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4054,7 +4235,7 @@ func (x *RoundRobinArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RoundRobinArg.ProtoReflect.Descriptor instead.
 func (*RoundRobinArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{70}
+	return file_module_msg_proto_rawDescGZIP(), []int{73}
 }
 
 func (x *RoundRobinArg) GetGates() []int64 {
@@ -4086,7 +4267,7 @@ type ReplicateArg struct {
 
 func (x *ReplicateArg) Reset() {
 	*x = ReplicateArg{}
-	mi := &file_module_msg_proto_msgTypes[71]
+	mi := &file_module_msg_proto_msgTypes[74]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4099,7 +4280,7 @@ func (x *ReplicateArg) String() string {
 func (*ReplicateArg) ProtoMessage() {}
 
 func (x *ReplicateArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[71]
+	mi := &file_module_msg_proto_msgTypes[74]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4112,7 +4293,7 @@ func (x *ReplicateArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReplicateArg.ProtoReflect.Descriptor instead.
 func (*ReplicateArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{71}
+	return file_module_msg_proto_rawDescGZIP(), []int{74}
 }
 
 func (x *ReplicateArg) GetGates() []int64 {
@@ -4134,7 +4315,7 @@ type ReplicateCommandSetGatesArg struct {
 
 func (x *ReplicateCommandSetGatesArg) Reset() {
 	*x = ReplicateCommandSetGatesArg{}
-	mi := &file_module_msg_proto_msgTypes[72]
+	mi := &file_module_msg_proto_msgTypes[75]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4147,7 +4328,7 @@ func (x *ReplicateCommandSetGatesArg) String() string {
 func (*ReplicateCommandSetGatesArg) ProtoMessage() {}
 
 func (x *ReplicateCommandSetGatesArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[72]
+	mi := &file_module_msg_proto_msgTypes[75]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4160,7 +4341,7 @@ func (x *ReplicateCommandSetGatesArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReplicateCommandSetGatesArg.ProtoReflect.Descriptor instead.
 func (*ReplicateCommandSetGatesArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{72}
+	return file_module_msg_proto_rawDescGZIP(), []int{75}
 }
 
 func (x *ReplicateCommandSetGatesArg) GetGates() []int64 {
@@ -4186,7 +4367,7 @@ type SetMetadataArg struct {
 
 func (x *SetMetadataArg) Reset() {
 	*x = SetMetadataArg{}
-	mi := &file_module_msg_proto_msgTypes[73]
+	mi := &file_module_msg_proto_msgTypes[76]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4199,7 +4380,7 @@ func (x *SetMetadataArg) String() string {
 func (*SetMetadataArg) ProtoMessage() {}
 
 func (x *SetMetadataArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[73]
+	mi := &file_module_msg_proto_msgTypes[76]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4212,7 +4393,7 @@ func (x *SetMetadataArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetMetadataArg.ProtoReflect.Descriptor instead.
 func (*SetMetadataArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{73}
+	return file_module_msg_proto_rawDescGZIP(), []int{76}
 }
 
 func (x *SetMetadataArg) GetAttrs() []*SetMetadataArg_Attribute {
@@ -4235,7 +4416,7 @@ type SinkArg struct {
 
 func (x *SinkArg) Reset() {
 	*x = SinkArg{}
-	mi := &file_module_msg_proto_msgTypes[74]
+	mi := &file_module_msg_proto_msgTypes[77]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4248,7 +4429,7 @@ func (x *SinkArg) String() string {
 func (*SinkArg) ProtoMessage() {}
 
 func (x *SinkArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[74]
+	mi := &file_module_msg_proto_msgTypes[77]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4261,7 +4442,7 @@ func (x *SinkArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SinkArg.ProtoReflect.Descriptor instead.
 func (*SinkArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{74}
+	return file_module_msg_proto_rawDescGZIP(), []int{77}
 }
 
 // *
@@ -4277,7 +4458,7 @@ type SourceCommandSetBurstArg struct {
 
 func (x *SourceCommandSetBurstArg) Reset() {
 	*x = SourceCommandSetBurstArg{}
-	mi := &file_module_msg_proto_msgTypes[75]
+	mi := &file_module_msg_proto_msgTypes[78]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4290,7 +4471,7 @@ func (x *SourceCommandSetBurstArg) String() string {
 func (*SourceCommandSetBurstArg) ProtoMessage() {}
 
 func (x *SourceCommandSetBurstArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[75]
+	mi := &file_module_msg_proto_msgTypes[78]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4303,7 +4484,7 @@ func (x *SourceCommandSetBurstArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SourceCommandSetBurstArg.ProtoReflect.Descriptor instead.
 func (*SourceCommandSetBurstArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{75}
+	return file_module_msg_proto_rawDescGZIP(), []int{78}
 }
 
 func (x *SourceCommandSetBurstArg) GetBurst() uint64 {
@@ -4325,7 +4506,7 @@ type SourceCommandSetPktSizeArg struct {
 
 func (x *SourceCommandSetPktSizeArg) Reset() {
 	*x = SourceCommandSetPktSizeArg{}
-	mi := &file_module_msg_proto_msgTypes[76]
+	mi := &file_module_msg_proto_msgTypes[79]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4338,7 +4519,7 @@ func (x *SourceCommandSetPktSizeArg) String() string {
 func (*SourceCommandSetPktSizeArg) ProtoMessage() {}
 
 func (x *SourceCommandSetPktSizeArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[76]
+	mi := &file_module_msg_proto_msgTypes[79]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4351,7 +4532,7 @@ func (x *SourceCommandSetPktSizeArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SourceCommandSetPktSizeArg.ProtoReflect.Descriptor instead.
 func (*SourceCommandSetPktSizeArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{76}
+	return file_module_msg_proto_rawDescGZIP(), []int{79}
 }
 
 func (x *SourceCommandSetPktSizeArg) GetPktSize() uint64 {
@@ -4375,7 +4556,7 @@ type SourceArg struct {
 
 func (x *SourceArg) Reset() {
 	*x = SourceArg{}
-	mi := &file_module_msg_proto_msgTypes[77]
+	mi := &file_module_msg_proto_msgTypes[80]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4388,7 +4569,7 @@ func (x *SourceArg) String() string {
 func (*SourceArg) ProtoMessage() {}
 
 func (x *SourceArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[77]
+	mi := &file_module_msg_proto_msgTypes[80]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4401,7 +4582,7 @@ func (x *SourceArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SourceArg.ProtoReflect.Descriptor instead.
 func (*SourceArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{77}
+	return file_module_msg_proto_rawDescGZIP(), []int{80}
 }
 
 func (x *SourceArg) GetPktSize() uint64 {
@@ -4429,7 +4610,7 @@ type IPChecksumArg struct {
 
 func (x *IPChecksumArg) Reset() {
 	*x = IPChecksumArg{}
-	mi := &file_module_msg_proto_msgTypes[78]
+	mi := &file_module_msg_proto_msgTypes[81]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4442,7 +4623,7 @@ func (x *IPChecksumArg) String() string {
 func (*IPChecksumArg) ProtoMessage() {}
 
 func (x *IPChecksumArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[78]
+	mi := &file_module_msg_proto_msgTypes[81]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4455,7 +4636,7 @@ func (x *IPChecksumArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IPChecksumArg.ProtoReflect.Descriptor instead.
 func (*IPChecksumArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{78}
+	return file_module_msg_proto_rawDescGZIP(), []int{81}
 }
 
 func (x *IPChecksumArg) GetVerify() bool {
@@ -4490,7 +4671,7 @@ type L4ChecksumArg struct {
 
 func (x *L4ChecksumArg) Reset() {
 	*x = L4ChecksumArg{}
-	mi := &file_module_msg_proto_msgTypes[79]
+	mi := &file_module_msg_proto_msgTypes[82]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4503,7 +4684,7 @@ func (x *L4ChecksumArg) String() string {
 func (*L4ChecksumArg) ProtoMessage() {}
 
 func (x *L4ChecksumArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[79]
+	mi := &file_module_msg_proto_msgTypes[82]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4516,7 +4697,7 @@ func (x *L4ChecksumArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use L4ChecksumArg.ProtoReflect.Descriptor instead.
 func (*L4ChecksumArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{79}
+	return file_module_msg_proto_rawDescGZIP(), []int{82}
 }
 
 func (x *L4ChecksumArg) GetVerify() bool {
@@ -4541,15 +4722,17 @@ func (x *L4ChecksumArg) GetHw() bool {
 // __Input Gates__: 1
 // __Output Gates__: 1
 type GtpuEchoArg struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	S1USgwIp      uint32                 `protobuf:"varint,1,opt,name=s1u_sgw_ip,json=s1uSgwIp,proto3" json:"s1u_sgw_ip,omitempty"` /// IP address of S1U interface
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	S1USgwIp uint32                 `protobuf:"varint,1,opt,name=s1u_sgw_ip,json=s1uSgwIp,proto3" json:"s1u_sgw_ip,omitempty"` /// IP address of S1U interface
+	/// The access interface has IPv6 addresses; s1u_sgw_ip may then be 0 (none).
+	Ipv6          bool `protobuf:"varint,2,opt,name=ipv6,proto3" json:"ipv6,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *GtpuEchoArg) Reset() {
 	*x = GtpuEchoArg{}
-	mi := &file_module_msg_proto_msgTypes[80]
+	mi := &file_module_msg_proto_msgTypes[83]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4562,7 +4745,7 @@ func (x *GtpuEchoArg) String() string {
 func (*GtpuEchoArg) ProtoMessage() {}
 
 func (x *GtpuEchoArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[80]
+	mi := &file_module_msg_proto_msgTypes[83]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4575,7 +4758,7 @@ func (x *GtpuEchoArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GtpuEchoArg.ProtoReflect.Descriptor instead.
 func (*GtpuEchoArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{80}
+	return file_module_msg_proto_rawDescGZIP(), []int{83}
 }
 
 func (x *GtpuEchoArg) GetS1USgwIp() uint32 {
@@ -4583,6 +4766,13 @@ func (x *GtpuEchoArg) GetS1USgwIp() uint32 {
 		return x.S1USgwIp
 	}
 	return 0
+}
+
+func (x *GtpuEchoArg) GetIpv6() bool {
+	if x != nil {
+		return x.Ipv6
+	}
+	return false
 }
 
 // *
@@ -4602,7 +4792,7 @@ type IPDefragArg struct {
 
 func (x *IPDefragArg) Reset() {
 	*x = IPDefragArg{}
-	mi := &file_module_msg_proto_msgTypes[81]
+	mi := &file_module_msg_proto_msgTypes[84]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4615,7 +4805,7 @@ func (x *IPDefragArg) String() string {
 func (*IPDefragArg) ProtoMessage() {}
 
 func (x *IPDefragArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[81]
+	mi := &file_module_msg_proto_msgTypes[84]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4628,7 +4818,7 @@ func (x *IPDefragArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IPDefragArg.ProtoReflect.Descriptor instead.
 func (*IPDefragArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{81}
+	return file_module_msg_proto_rawDescGZIP(), []int{84}
 }
 
 func (x *IPDefragArg) GetNumFlows() uint32 {
@@ -4660,7 +4850,7 @@ type IPFragArg struct {
 
 func (x *IPFragArg) Reset() {
 	*x = IPFragArg{}
-	mi := &file_module_msg_proto_msgTypes[82]
+	mi := &file_module_msg_proto_msgTypes[85]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4673,7 +4863,7 @@ func (x *IPFragArg) String() string {
 func (*IPFragArg) ProtoMessage() {}
 
 func (x *IPFragArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[82]
+	mi := &file_module_msg_proto_msgTypes[85]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4686,7 +4876,7 @@ func (x *IPFragArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IPFragArg.ProtoReflect.Descriptor instead.
 func (*IPFragArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{82}
+	return file_module_msg_proto_rawDescGZIP(), []int{85}
 }
 
 func (x *IPFragArg) GetMtu() int32 {
@@ -4710,7 +4900,7 @@ type CounterAddArg struct {
 
 func (x *CounterAddArg) Reset() {
 	*x = CounterAddArg{}
-	mi := &file_module_msg_proto_msgTypes[83]
+	mi := &file_module_msg_proto_msgTypes[86]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4723,7 +4913,7 @@ func (x *CounterAddArg) String() string {
 func (*CounterAddArg) ProtoMessage() {}
 
 func (x *CounterAddArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[83]
+	mi := &file_module_msg_proto_msgTypes[86]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4736,7 +4926,7 @@ func (x *CounterAddArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CounterAddArg.ProtoReflect.Descriptor instead.
 func (*CounterAddArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{83}
+	return file_module_msg_proto_rawDescGZIP(), []int{86}
 }
 
 func (x *CounterAddArg) GetCtrId() uint32 {
@@ -4760,7 +4950,7 @@ type CounterRemoveArg struct {
 
 func (x *CounterRemoveArg) Reset() {
 	*x = CounterRemoveArg{}
-	mi := &file_module_msg_proto_msgTypes[84]
+	mi := &file_module_msg_proto_msgTypes[87]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4773,7 +4963,7 @@ func (x *CounterRemoveArg) String() string {
 func (*CounterRemoveArg) ProtoMessage() {}
 
 func (x *CounterRemoveArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[84]
+	mi := &file_module_msg_proto_msgTypes[87]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4786,7 +4976,7 @@ func (x *CounterRemoveArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CounterRemoveArg.ProtoReflect.Descriptor instead.
 func (*CounterRemoveArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{84}
+	return file_module_msg_proto_rawDescGZIP(), []int{87}
 }
 
 func (x *CounterRemoveArg) GetCtrId() uint32 {
@@ -4813,7 +5003,7 @@ type CounterArg struct {
 
 func (x *CounterArg) Reset() {
 	*x = CounterArg{}
-	mi := &file_module_msg_proto_msgTypes[85]
+	mi := &file_module_msg_proto_msgTypes[88]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4826,7 +5016,7 @@ func (x *CounterArg) String() string {
 func (*CounterArg) ProtoMessage() {}
 
 func (x *CounterArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[85]
+	mi := &file_module_msg_proto_msgTypes[88]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4839,7 +5029,7 @@ func (x *CounterArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CounterArg.ProtoReflect.Descriptor instead.
 func (*CounterArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{85}
+	return file_module_msg_proto_rawDescGZIP(), []int{88}
 }
 
 func (x *CounterArg) GetNameId() string {
@@ -4869,15 +5059,22 @@ func (x *CounterArg) GetTotal() uint32 {
 // __Input Gates__: 1
 // __Output Gates__: 1
 type GtpuEncapArg struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	AddPsc        bool                   `protobuf:"varint,1,opt,name=add_psc,json=addPsc,proto3" json:"add_psc,omitempty"` /// Add PDU session container in encap (default = False)
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	AddPsc bool                   `protobuf:"varint,1,opt,name=add_psc,json=addPsc,proto3" json:"add_psc,omitempty"` /// Add PDU session container in encap (default = False)
+	/// The UPF's IPv6 addresses an IPv6 outer header is sent from: access for
+	/// downlink (action 0), core for uplink (action 1). Empty: no IPv6 outer
+	/// header in that direction. With either set, the module reads the IPv6
+	/// peer from the tunnel_out_dst_ip6_hi/lo attributes (8 bytes each, zero for
+	/// an IPv4 peer).
+	AccessIp6     string `protobuf:"bytes,2,opt,name=access_ip6,json=accessIp6,proto3" json:"access_ip6,omitempty"`
+	CoreIp6       string `protobuf:"bytes,3,opt,name=core_ip6,json=coreIp6,proto3" json:"core_ip6,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *GtpuEncapArg) Reset() {
 	*x = GtpuEncapArg{}
-	mi := &file_module_msg_proto_msgTypes[86]
+	mi := &file_module_msg_proto_msgTypes[89]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4890,7 +5087,7 @@ func (x *GtpuEncapArg) String() string {
 func (*GtpuEncapArg) ProtoMessage() {}
 
 func (x *GtpuEncapArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[86]
+	mi := &file_module_msg_proto_msgTypes[89]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4903,7 +5100,7 @@ func (x *GtpuEncapArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GtpuEncapArg.ProtoReflect.Descriptor instead.
 func (*GtpuEncapArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{86}
+	return file_module_msg_proto_rawDescGZIP(), []int{89}
 }
 
 func (x *GtpuEncapArg) GetAddPsc() bool {
@@ -4911,6 +5108,20 @@ func (x *GtpuEncapArg) GetAddPsc() bool {
 		return x.AddPsc
 	}
 	return false
+}
+
+func (x *GtpuEncapArg) GetAccessIp6() string {
+	if x != nil {
+		return x.AccessIp6
+	}
+	return ""
+}
+
+func (x *GtpuEncapArg) GetCoreIp6() string {
+	if x != nil {
+		return x.CoreIp6
+	}
+	return ""
 }
 
 // *
@@ -4934,7 +5145,7 @@ type SplitArg struct {
 
 func (x *SplitArg) Reset() {
 	*x = SplitArg{}
-	mi := &file_module_msg_proto_msgTypes[87]
+	mi := &file_module_msg_proto_msgTypes[90]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4947,7 +5158,7 @@ func (x *SplitArg) String() string {
 func (*SplitArg) ProtoMessage() {}
 
 func (x *SplitArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[87]
+	mi := &file_module_msg_proto_msgTypes[90]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4960,7 +5171,7 @@ func (x *SplitArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SplitArg.ProtoReflect.Descriptor instead.
 func (*SplitArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{87}
+	return file_module_msg_proto_rawDescGZIP(), []int{90}
 }
 
 func (x *SplitArg) GetSize() uint64 {
@@ -5034,7 +5245,7 @@ type TimestampArg struct {
 
 func (x *TimestampArg) Reset() {
 	*x = TimestampArg{}
-	mi := &file_module_msg_proto_msgTypes[88]
+	mi := &file_module_msg_proto_msgTypes[91]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5047,7 +5258,7 @@ func (x *TimestampArg) String() string {
 func (*TimestampArg) ProtoMessage() {}
 
 func (x *TimestampArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[88]
+	mi := &file_module_msg_proto_msgTypes[91]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5060,7 +5271,7 @@ func (x *TimestampArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TimestampArg.ProtoReflect.Descriptor instead.
 func (*TimestampArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{88}
+	return file_module_msg_proto_rawDescGZIP(), []int{91}
 }
 
 func (x *TimestampArg) GetType() isTimestampArg_Type {
@@ -5120,7 +5331,7 @@ type UpdateArg struct {
 
 func (x *UpdateArg) Reset() {
 	*x = UpdateArg{}
-	mi := &file_module_msg_proto_msgTypes[89]
+	mi := &file_module_msg_proto_msgTypes[92]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5133,7 +5344,7 @@ func (x *UpdateArg) String() string {
 func (*UpdateArg) ProtoMessage() {}
 
 func (x *UpdateArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[89]
+	mi := &file_module_msg_proto_msgTypes[92]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5146,7 +5357,7 @@ func (x *UpdateArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateArg.ProtoReflect.Descriptor instead.
 func (*UpdateArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{89}
+	return file_module_msg_proto_rawDescGZIP(), []int{92}
 }
 
 func (x *UpdateArg) GetFields() []*UpdateArg_Field {
@@ -5174,7 +5385,7 @@ type UrlFilterArg struct {
 
 func (x *UrlFilterArg) Reset() {
 	*x = UrlFilterArg{}
-	mi := &file_module_msg_proto_msgTypes[90]
+	mi := &file_module_msg_proto_msgTypes[93]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5187,7 +5398,7 @@ func (x *UrlFilterArg) String() string {
 func (*UrlFilterArg) ProtoMessage() {}
 
 func (x *UrlFilterArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[90]
+	mi := &file_module_msg_proto_msgTypes[93]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5200,7 +5411,7 @@ func (x *UrlFilterArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UrlFilterArg.ProtoReflect.Descriptor instead.
 func (*UrlFilterArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{90}
+	return file_module_msg_proto_rawDescGZIP(), []int{93}
 }
 
 func (x *UrlFilterArg) GetBlacklist() []*UrlFilterArg_Url {
@@ -5224,7 +5435,7 @@ type UrlFilterConfig struct {
 
 func (x *UrlFilterConfig) Reset() {
 	*x = UrlFilterConfig{}
-	mi := &file_module_msg_proto_msgTypes[91]
+	mi := &file_module_msg_proto_msgTypes[94]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5237,7 +5448,7 @@ func (x *UrlFilterConfig) String() string {
 func (*UrlFilterConfig) ProtoMessage() {}
 
 func (x *UrlFilterConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[91]
+	mi := &file_module_msg_proto_msgTypes[94]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5250,7 +5461,7 @@ func (x *UrlFilterConfig) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UrlFilterConfig.ProtoReflect.Descriptor instead.
 func (*UrlFilterConfig) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{91}
+	return file_module_msg_proto_rawDescGZIP(), []int{94}
 }
 
 func (x *UrlFilterConfig) GetBlacklist() []*UrlFilterArg_Url {
@@ -5273,7 +5484,7 @@ type VLANPopArg struct {
 
 func (x *VLANPopArg) Reset() {
 	*x = VLANPopArg{}
-	mi := &file_module_msg_proto_msgTypes[92]
+	mi := &file_module_msg_proto_msgTypes[95]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5286,7 +5497,7 @@ func (x *VLANPopArg) String() string {
 func (*VLANPopArg) ProtoMessage() {}
 
 func (x *VLANPopArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[92]
+	mi := &file_module_msg_proto_msgTypes[95]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5299,7 +5510,7 @@ func (x *VLANPopArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use VLANPopArg.ProtoReflect.Descriptor instead.
 func (*VLANPopArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{92}
+	return file_module_msg_proto_rawDescGZIP(), []int{95}
 }
 
 // *
@@ -5316,7 +5527,7 @@ type VLANPushArg struct {
 
 func (x *VLANPushArg) Reset() {
 	*x = VLANPushArg{}
-	mi := &file_module_msg_proto_msgTypes[93]
+	mi := &file_module_msg_proto_msgTypes[96]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5329,7 +5540,7 @@ func (x *VLANPushArg) String() string {
 func (*VLANPushArg) ProtoMessage() {}
 
 func (x *VLANPushArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[93]
+	mi := &file_module_msg_proto_msgTypes[96]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5342,7 +5553,7 @@ func (x *VLANPushArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use VLANPushArg.ProtoReflect.Descriptor instead.
 func (*VLANPushArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{93}
+	return file_module_msg_proto_rawDescGZIP(), []int{96}
 }
 
 func (x *VLANPushArg) GetTci() uint64 {
@@ -5366,7 +5577,7 @@ type VLANSplitArg struct {
 
 func (x *VLANSplitArg) Reset() {
 	*x = VLANSplitArg{}
-	mi := &file_module_msg_proto_msgTypes[94]
+	mi := &file_module_msg_proto_msgTypes[97]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5379,7 +5590,7 @@ func (x *VLANSplitArg) String() string {
 func (*VLANSplitArg) ProtoMessage() {}
 
 func (x *VLANSplitArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[94]
+	mi := &file_module_msg_proto_msgTypes[97]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5392,7 +5603,7 @@ func (x *VLANSplitArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use VLANSplitArg.ProtoReflect.Descriptor instead.
 func (*VLANSplitArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{94}
+	return file_module_msg_proto_rawDescGZIP(), []int{97}
 }
 
 // *
@@ -5408,7 +5619,7 @@ type VXLANDecapArg struct {
 
 func (x *VXLANDecapArg) Reset() {
 	*x = VXLANDecapArg{}
-	mi := &file_module_msg_proto_msgTypes[95]
+	mi := &file_module_msg_proto_msgTypes[98]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5421,7 +5632,7 @@ func (x *VXLANDecapArg) String() string {
 func (*VXLANDecapArg) ProtoMessage() {}
 
 func (x *VXLANDecapArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[95]
+	mi := &file_module_msg_proto_msgTypes[98]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5434,7 +5645,7 @@ func (x *VXLANDecapArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use VXLANDecapArg.ProtoReflect.Descriptor instead.
 func (*VXLANDecapArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{95}
+	return file_module_msg_proto_rawDescGZIP(), []int{98}
 }
 
 // *
@@ -5452,7 +5663,7 @@ type VXLANEncapArg struct {
 
 func (x *VXLANEncapArg) Reset() {
 	*x = VXLANEncapArg{}
-	mi := &file_module_msg_proto_msgTypes[96]
+	mi := &file_module_msg_proto_msgTypes[99]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5465,7 +5676,7 @@ func (x *VXLANEncapArg) String() string {
 func (*VXLANEncapArg) ProtoMessage() {}
 
 func (x *VXLANEncapArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[96]
+	mi := &file_module_msg_proto_msgTypes[99]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5478,7 +5689,7 @@ func (x *VXLANEncapArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use VXLANEncapArg.ProtoReflect.Descriptor instead.
 func (*VXLANEncapArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{96}
+	return file_module_msg_proto_rawDescGZIP(), []int{99}
 }
 
 func (x *VXLANEncapArg) GetDstport() uint64 {
@@ -5515,7 +5726,7 @@ type WildcardMatchArg struct {
 
 func (x *WildcardMatchArg) Reset() {
 	*x = WildcardMatchArg{}
-	mi := &file_module_msg_proto_msgTypes[97]
+	mi := &file_module_msg_proto_msgTypes[100]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5528,7 +5739,7 @@ func (x *WildcardMatchArg) String() string {
 func (*WildcardMatchArg) ProtoMessage() {}
 
 func (x *WildcardMatchArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[97]
+	mi := &file_module_msg_proto_msgTypes[100]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5541,7 +5752,7 @@ func (x *WildcardMatchArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WildcardMatchArg.ProtoReflect.Descriptor instead.
 func (*WildcardMatchArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{97}
+	return file_module_msg_proto_rawDescGZIP(), []int{100}
 }
 
 func (x *WildcardMatchArg) GetFields() []*Field {
@@ -5593,7 +5804,7 @@ type WildcardMatchConfig struct {
 
 func (x *WildcardMatchConfig) Reset() {
 	*x = WildcardMatchConfig{}
-	mi := &file_module_msg_proto_msgTypes[98]
+	mi := &file_module_msg_proto_msgTypes[101]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5606,7 +5817,7 @@ func (x *WildcardMatchConfig) String() string {
 func (*WildcardMatchConfig) ProtoMessage() {}
 
 func (x *WildcardMatchConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[98]
+	mi := &file_module_msg_proto_msgTypes[101]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5619,7 +5830,7 @@ func (x *WildcardMatchConfig) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WildcardMatchConfig.ProtoReflect.Descriptor instead.
 func (*WildcardMatchConfig) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{98}
+	return file_module_msg_proto_rawDescGZIP(), []int{101}
 }
 
 func (x *WildcardMatchConfig) GetDefaultGate() uint64 {
@@ -5654,7 +5865,7 @@ type ArpResponderArg struct {
 
 func (x *ArpResponderArg) Reset() {
 	*x = ArpResponderArg{}
-	mi := &file_module_msg_proto_msgTypes[99]
+	mi := &file_module_msg_proto_msgTypes[102]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5667,7 +5878,7 @@ func (x *ArpResponderArg) String() string {
 func (*ArpResponderArg) ProtoMessage() {}
 
 func (x *ArpResponderArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[99]
+	mi := &file_module_msg_proto_msgTypes[102]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5680,7 +5891,7 @@ func (x *ArpResponderArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ArpResponderArg.ProtoReflect.Descriptor instead.
 func (*ArpResponderArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{99}
+	return file_module_msg_proto_rawDescGZIP(), []int{102}
 }
 
 func (x *ArpResponderArg) GetIp() string {
@@ -5712,7 +5923,7 @@ type MplsPopArg struct {
 
 func (x *MplsPopArg) Reset() {
 	*x = MplsPopArg{}
-	mi := &file_module_msg_proto_msgTypes[100]
+	mi := &file_module_msg_proto_msgTypes[103]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5725,7 +5936,7 @@ func (x *MplsPopArg) String() string {
 func (*MplsPopArg) ProtoMessage() {}
 
 func (x *MplsPopArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[100]
+	mi := &file_module_msg_proto_msgTypes[103]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5738,7 +5949,7 @@ func (x *MplsPopArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MplsPopArg.ProtoReflect.Descriptor instead.
 func (*MplsPopArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{100}
+	return file_module_msg_proto_rawDescGZIP(), []int{103}
 }
 
 func (x *MplsPopArg) GetRemoveEthHeader() bool {
@@ -5778,7 +5989,7 @@ type WorkerSplitArg struct {
 
 func (x *WorkerSplitArg) Reset() {
 	*x = WorkerSplitArg{}
-	mi := &file_module_msg_proto_msgTypes[101]
+	mi := &file_module_msg_proto_msgTypes[104]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5791,7 +6002,7 @@ func (x *WorkerSplitArg) String() string {
 func (*WorkerSplitArg) ProtoMessage() {}
 
 func (x *WorkerSplitArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[101]
+	mi := &file_module_msg_proto_msgTypes[104]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5804,7 +6015,7 @@ func (x *WorkerSplitArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WorkerSplitArg.ProtoReflect.Descriptor instead.
 func (*WorkerSplitArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{101}
+	return file_module_msg_proto_rawDescGZIP(), []int{104}
 }
 
 func (x *WorkerSplitArg) GetWorkerGates() map[uint32]uint32 {
@@ -5825,7 +6036,7 @@ type QosArg struct {
 
 func (x *QosArg) Reset() {
 	*x = QosArg{}
-	mi := &file_module_msg_proto_msgTypes[102]
+	mi := &file_module_msg_proto_msgTypes[105]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5838,7 +6049,7 @@ func (x *QosArg) String() string {
 func (*QosArg) ProtoMessage() {}
 
 func (x *QosArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[102]
+	mi := &file_module_msg_proto_msgTypes[105]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5851,7 +6062,7 @@ func (x *QosArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QosArg.ProtoReflect.Descriptor instead.
 func (*QosArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{102}
+	return file_module_msg_proto_rawDescGZIP(), []int{105}
 }
 
 func (x *QosArg) GetFields() []*Field {
@@ -5895,7 +6106,7 @@ type QosCommandAddArg struct {
 
 func (x *QosCommandAddArg) Reset() {
 	*x = QosCommandAddArg{}
-	mi := &file_module_msg_proto_msgTypes[103]
+	mi := &file_module_msg_proto_msgTypes[106]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5908,7 +6119,7 @@ func (x *QosCommandAddArg) String() string {
 func (*QosCommandAddArg) ProtoMessage() {}
 
 func (x *QosCommandAddArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[103]
+	mi := &file_module_msg_proto_msgTypes[106]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5921,7 +6132,7 @@ func (x *QosCommandAddArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QosCommandAddArg.ProtoReflect.Descriptor instead.
 func (*QosCommandAddArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{103}
+	return file_module_msg_proto_rawDescGZIP(), []int{106}
 }
 
 func (x *QosCommandAddArg) GetGate() uint64 {
@@ -6016,7 +6227,7 @@ type QosCommandDeleteArg struct {
 
 func (x *QosCommandDeleteArg) Reset() {
 	*x = QosCommandDeleteArg{}
-	mi := &file_module_msg_proto_msgTypes[104]
+	mi := &file_module_msg_proto_msgTypes[107]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6029,7 +6240,7 @@ func (x *QosCommandDeleteArg) String() string {
 func (*QosCommandDeleteArg) ProtoMessage() {}
 
 func (x *QosCommandDeleteArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[104]
+	mi := &file_module_msg_proto_msgTypes[107]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6042,7 +6253,7 @@ func (x *QosCommandDeleteArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QosCommandDeleteArg.ProtoReflect.Descriptor instead.
 func (*QosCommandDeleteArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{104}
+	return file_module_msg_proto_rawDescGZIP(), []int{107}
 }
 
 func (x *QosCommandDeleteArg) GetFields() []*FieldData {
@@ -6064,7 +6275,7 @@ type QosCommandClearArg struct {
 
 func (x *QosCommandClearArg) Reset() {
 	*x = QosCommandClearArg{}
-	mi := &file_module_msg_proto_msgTypes[105]
+	mi := &file_module_msg_proto_msgTypes[108]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6077,7 +6288,7 @@ func (x *QosCommandClearArg) String() string {
 func (*QosCommandClearArg) ProtoMessage() {}
 
 func (x *QosCommandClearArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[105]
+	mi := &file_module_msg_proto_msgTypes[108]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6090,7 +6301,7 @@ func (x *QosCommandClearArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QosCommandClearArg.ProtoReflect.Descriptor instead.
 func (*QosCommandClearArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{105}
+	return file_module_msg_proto_rawDescGZIP(), []int{108}
 }
 
 // *
@@ -6106,7 +6317,7 @@ type QosCommandSetDefaultGateArg struct {
 
 func (x *QosCommandSetDefaultGateArg) Reset() {
 	*x = QosCommandSetDefaultGateArg{}
-	mi := &file_module_msg_proto_msgTypes[106]
+	mi := &file_module_msg_proto_msgTypes[109]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6119,7 +6330,7 @@ func (x *QosCommandSetDefaultGateArg) String() string {
 func (*QosCommandSetDefaultGateArg) ProtoMessage() {}
 
 func (x *QosCommandSetDefaultGateArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[106]
+	mi := &file_module_msg_proto_msgTypes[109]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6132,7 +6343,7 @@ func (x *QosCommandSetDefaultGateArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QosCommandSetDefaultGateArg.ProtoReflect.Descriptor instead.
 func (*QosCommandSetDefaultGateArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{106}
+	return file_module_msg_proto_rawDescGZIP(), []int{109}
 }
 
 func (x *QosCommandSetDefaultGateArg) GetGate() uint64 {
@@ -6153,7 +6364,7 @@ type FlowMeasureArg struct {
 
 func (x *FlowMeasureArg) Reset() {
 	*x = FlowMeasureArg{}
-	mi := &file_module_msg_proto_msgTypes[107]
+	mi := &file_module_msg_proto_msgTypes[110]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6166,7 +6377,7 @@ func (x *FlowMeasureArg) String() string {
 func (*FlowMeasureArg) ProtoMessage() {}
 
 func (x *FlowMeasureArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[107]
+	mi := &file_module_msg_proto_msgTypes[110]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6179,7 +6390,7 @@ func (x *FlowMeasureArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FlowMeasureArg.ProtoReflect.Descriptor instead.
 func (*FlowMeasureArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{107}
+	return file_module_msg_proto_rawDescGZIP(), []int{110}
 }
 
 func (x *FlowMeasureArg) GetFlagAttrName() string {
@@ -6215,7 +6426,7 @@ type FlowMeasureCommandReadArg struct {
 
 func (x *FlowMeasureCommandReadArg) Reset() {
 	*x = FlowMeasureCommandReadArg{}
-	mi := &file_module_msg_proto_msgTypes[108]
+	mi := &file_module_msg_proto_msgTypes[111]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6228,7 +6439,7 @@ func (x *FlowMeasureCommandReadArg) String() string {
 func (*FlowMeasureCommandReadArg) ProtoMessage() {}
 
 func (x *FlowMeasureCommandReadArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[108]
+	mi := &file_module_msg_proto_msgTypes[111]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6241,7 +6452,7 @@ func (x *FlowMeasureCommandReadArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FlowMeasureCommandReadArg.ProtoReflect.Descriptor instead.
 func (*FlowMeasureCommandReadArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{108}
+	return file_module_msg_proto_rawDescGZIP(), []int{111}
 }
 
 func (x *FlowMeasureCommandReadArg) GetClear() bool {
@@ -6281,7 +6492,7 @@ type FlowMeasureReadResponse struct {
 
 func (x *FlowMeasureReadResponse) Reset() {
 	*x = FlowMeasureReadResponse{}
-	mi := &file_module_msg_proto_msgTypes[109]
+	mi := &file_module_msg_proto_msgTypes[112]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6294,7 +6505,7 @@ func (x *FlowMeasureReadResponse) String() string {
 func (*FlowMeasureReadResponse) ProtoMessage() {}
 
 func (x *FlowMeasureReadResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[109]
+	mi := &file_module_msg_proto_msgTypes[112]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6307,7 +6518,7 @@ func (x *FlowMeasureReadResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FlowMeasureReadResponse.ProtoReflect.Descriptor instead.
 func (*FlowMeasureReadResponse) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{109}
+	return file_module_msg_proto_rawDescGZIP(), []int{112}
 }
 
 func (x *FlowMeasureReadResponse) GetStatistics() []*FlowMeasureReadResponse_Statistic {
@@ -6325,7 +6536,7 @@ type FlowMeasureCommandFlipArg struct {
 
 func (x *FlowMeasureCommandFlipArg) Reset() {
 	*x = FlowMeasureCommandFlipArg{}
-	mi := &file_module_msg_proto_msgTypes[110]
+	mi := &file_module_msg_proto_msgTypes[113]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6338,7 +6549,7 @@ func (x *FlowMeasureCommandFlipArg) String() string {
 func (*FlowMeasureCommandFlipArg) ProtoMessage() {}
 
 func (x *FlowMeasureCommandFlipArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[110]
+	mi := &file_module_msg_proto_msgTypes[113]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6351,7 +6562,7 @@ func (x *FlowMeasureCommandFlipArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FlowMeasureCommandFlipArg.ProtoReflect.Descriptor instead.
 func (*FlowMeasureCommandFlipArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{110}
+	return file_module_msg_proto_rawDescGZIP(), []int{113}
 }
 
 type FlowMeasureFlipResponse struct {
@@ -6363,7 +6574,7 @@ type FlowMeasureFlipResponse struct {
 
 func (x *FlowMeasureFlipResponse) Reset() {
 	*x = FlowMeasureFlipResponse{}
-	mi := &file_module_msg_proto_msgTypes[111]
+	mi := &file_module_msg_proto_msgTypes[114]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6376,7 +6587,7 @@ func (x *FlowMeasureFlipResponse) String() string {
 func (*FlowMeasureFlipResponse) ProtoMessage() {}
 
 func (x *FlowMeasureFlipResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[111]
+	mi := &file_module_msg_proto_msgTypes[114]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6389,7 +6600,7 @@ func (x *FlowMeasureFlipResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FlowMeasureFlipResponse.ProtoReflect.Descriptor instead.
 func (*FlowMeasureFlipResponse) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{111}
+	return file_module_msg_proto_rawDescGZIP(), []int{114}
 }
 
 func (x *FlowMeasureFlipResponse) GetOldFlag() uint64 {
@@ -6403,15 +6614,18 @@ func (x *FlowMeasureFlipResponse) GetOldFlag() uint64 {
 // The GtpuPathMonitoring module has a command `add()` and `delete().
 // This command add or deletes an IP address from the GtpuPathMonitoring module.
 type GtpuPathMonitoringCommandAddDeleteArg struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	GnbIp         uint32                 `protobuf:"varint,1,opt,name=gnb_ip,json=gnbIp,proto3" json:"gnb_ip,omitempty"` // The destination/gNB IP address.
+	state protoimpl.MessageState `protogen:"open.v1"`
+	GnbIp uint32                 `protobuf:"varint,1,opt,name=gnb_ip,json=gnbIp,proto3" json:"gnb_ip,omitempty"` // The destination/gNB IPv4 address.
+	/// The gNB's IPv6 address, 16 bytes in network order. When set, gnb_ip is
+	/// ignored, and the gNB is sent the requests of an IPv6 template.
+	GnbIp6        []byte `protobuf:"bytes,2,opt,name=gnb_ip6,json=gnbIp6,proto3" json:"gnb_ip6,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *GtpuPathMonitoringCommandAddDeleteArg) Reset() {
 	*x = GtpuPathMonitoringCommandAddDeleteArg{}
-	mi := &file_module_msg_proto_msgTypes[112]
+	mi := &file_module_msg_proto_msgTypes[115]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6424,7 +6638,7 @@ func (x *GtpuPathMonitoringCommandAddDeleteArg) String() string {
 func (*GtpuPathMonitoringCommandAddDeleteArg) ProtoMessage() {}
 
 func (x *GtpuPathMonitoringCommandAddDeleteArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[112]
+	mi := &file_module_msg_proto_msgTypes[115]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6437,7 +6651,7 @@ func (x *GtpuPathMonitoringCommandAddDeleteArg) ProtoReflect() protoreflect.Mess
 
 // Deprecated: Use GtpuPathMonitoringCommandAddDeleteArg.ProtoReflect.Descriptor instead.
 func (*GtpuPathMonitoringCommandAddDeleteArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{112}
+	return file_module_msg_proto_rawDescGZIP(), []int{115}
 }
 
 func (x *GtpuPathMonitoringCommandAddDeleteArg) GetGnbIp() uint32 {
@@ -6445,6 +6659,13 @@ func (x *GtpuPathMonitoringCommandAddDeleteArg) GetGnbIp() uint32 {
 		return x.GnbIp
 	}
 	return 0
+}
+
+func (x *GtpuPathMonitoringCommandAddDeleteArg) GetGnbIp6() []byte {
+	if x != nil {
+		return x.GnbIp6
+	}
+	return nil
 }
 
 // *
@@ -6459,7 +6680,7 @@ type GtpuPathMonitoringCommandClearArg struct {
 
 func (x *GtpuPathMonitoringCommandClearArg) Reset() {
 	*x = GtpuPathMonitoringCommandClearArg{}
-	mi := &file_module_msg_proto_msgTypes[113]
+	mi := &file_module_msg_proto_msgTypes[116]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6472,7 +6693,7 @@ func (x *GtpuPathMonitoringCommandClearArg) String() string {
 func (*GtpuPathMonitoringCommandClearArg) ProtoMessage() {}
 
 func (x *GtpuPathMonitoringCommandClearArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[113]
+	mi := &file_module_msg_proto_msgTypes[116]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6485,7 +6706,7 @@ func (x *GtpuPathMonitoringCommandClearArg) ProtoReflect() protoreflect.Message 
 
 // Deprecated: Use GtpuPathMonitoringCommandClearArg.ProtoReflect.Descriptor instead.
 func (*GtpuPathMonitoringCommandClearArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{113}
+	return file_module_msg_proto_rawDescGZIP(), []int{116}
 }
 
 // *
@@ -6501,7 +6722,7 @@ type GtpuPathMonitoringCommandReadArg struct {
 
 func (x *GtpuPathMonitoringCommandReadArg) Reset() {
 	*x = GtpuPathMonitoringCommandReadArg{}
-	mi := &file_module_msg_proto_msgTypes[114]
+	mi := &file_module_msg_proto_msgTypes[117]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6514,7 +6735,7 @@ func (x *GtpuPathMonitoringCommandReadArg) String() string {
 func (*GtpuPathMonitoringCommandReadArg) ProtoMessage() {}
 
 func (x *GtpuPathMonitoringCommandReadArg) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[114]
+	mi := &file_module_msg_proto_msgTypes[117]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6527,7 +6748,7 @@ func (x *GtpuPathMonitoringCommandReadArg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GtpuPathMonitoringCommandReadArg.ProtoReflect.Descriptor instead.
 func (*GtpuPathMonitoringCommandReadArg) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{114}
+	return file_module_msg_proto_rawDescGZIP(), []int{117}
 }
 
 func (x *GtpuPathMonitoringCommandReadArg) GetClear() bool {
@@ -6549,7 +6770,7 @@ type GtpuPathMonitoringCommandReadResponse struct {
 
 func (x *GtpuPathMonitoringCommandReadResponse) Reset() {
 	*x = GtpuPathMonitoringCommandReadResponse{}
-	mi := &file_module_msg_proto_msgTypes[115]
+	mi := &file_module_msg_proto_msgTypes[118]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6562,7 +6783,7 @@ func (x *GtpuPathMonitoringCommandReadResponse) String() string {
 func (*GtpuPathMonitoringCommandReadResponse) ProtoMessage() {}
 
 func (x *GtpuPathMonitoringCommandReadResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[115]
+	mi := &file_module_msg_proto_msgTypes[118]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6575,7 +6796,7 @@ func (x *GtpuPathMonitoringCommandReadResponse) ProtoReflect() protoreflect.Mess
 
 // Deprecated: Use GtpuPathMonitoringCommandReadResponse.ProtoReflect.Descriptor instead.
 func (*GtpuPathMonitoringCommandReadResponse) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{115}
+	return file_module_msg_proto_rawDescGZIP(), []int{118}
 }
 
 func (x *GtpuPathMonitoringCommandReadResponse) GetStatistics() []*GtpuPathMonitoringCommandReadResponse_Statistic {
@@ -6595,7 +6816,7 @@ type L2ForwardCommandAddArg_Entry struct {
 
 func (x *L2ForwardCommandAddArg_Entry) Reset() {
 	*x = L2ForwardCommandAddArg_Entry{}
-	mi := &file_module_msg_proto_msgTypes[116]
+	mi := &file_module_msg_proto_msgTypes[119]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6608,7 +6829,7 @@ func (x *L2ForwardCommandAddArg_Entry) String() string {
 func (*L2ForwardCommandAddArg_Entry) ProtoMessage() {}
 
 func (x *L2ForwardCommandAddArg_Entry) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[116]
+	mi := &file_module_msg_proto_msgTypes[119]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6621,7 +6842,7 @@ func (x *L2ForwardCommandAddArg_Entry) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use L2ForwardCommandAddArg_Entry.ProtoReflect.Descriptor instead.
 func (*L2ForwardCommandAddArg_Entry) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{12, 0}
+	return file_module_msg_proto_rawDescGZIP(), []int{14, 0}
 }
 
 func (x *L2ForwardCommandAddArg_Entry) GetAddr() string {
@@ -6654,7 +6875,7 @@ type MeasureCommandGetSummaryResponse_Histogram struct {
 
 func (x *MeasureCommandGetSummaryResponse_Histogram) Reset() {
 	*x = MeasureCommandGetSummaryResponse_Histogram{}
-	mi := &file_module_msg_proto_msgTypes[117]
+	mi := &file_module_msg_proto_msgTypes[120]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6667,7 +6888,7 @@ func (x *MeasureCommandGetSummaryResponse_Histogram) String() string {
 func (*MeasureCommandGetSummaryResponse_Histogram) ProtoMessage() {}
 
 func (x *MeasureCommandGetSummaryResponse_Histogram) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[117]
+	mi := &file_module_msg_proto_msgTypes[120]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6680,7 +6901,7 @@ func (x *MeasureCommandGetSummaryResponse_Histogram) ProtoReflect() protoreflect
 
 // Deprecated: Use MeasureCommandGetSummaryResponse_Histogram.ProtoReflect.Descriptor instead.
 func (*MeasureCommandGetSummaryResponse_Histogram) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{19, 0}
+	return file_module_msg_proto_rawDescGZIP(), []int{21, 0}
 }
 
 func (x *MeasureCommandGetSummaryResponse_Histogram) GetCount() uint64 {
@@ -6755,7 +6976,7 @@ type ACLArg_Rule struct {
 
 func (x *ACLArg_Rule) Reset() {
 	*x = ACLArg_Rule{}
-	mi := &file_module_msg_proto_msgTypes[118]
+	mi := &file_module_msg_proto_msgTypes[121]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6768,7 +6989,7 @@ func (x *ACLArg_Rule) String() string {
 func (*ACLArg_Rule) ProtoMessage() {}
 
 func (x *ACLArg_Rule) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[118]
+	mi := &file_module_msg_proto_msgTypes[121]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6781,7 +7002,7 @@ func (x *ACLArg_Rule) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ACLArg_Rule.ProtoReflect.Descriptor instead.
 func (*ACLArg_Rule) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{36, 0}
+	return file_module_msg_proto_rawDescGZIP(), []int{38, 0}
 }
 
 func (x *ACLArg_Rule) GetSrcIp() string {
@@ -6842,7 +7063,7 @@ type BPFArg_Filter struct {
 
 func (x *BPFArg_Filter) Reset() {
 	*x = BPFArg_Filter{}
-	mi := &file_module_msg_proto_msgTypes[119]
+	mi := &file_module_msg_proto_msgTypes[122]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6855,7 +7076,7 @@ func (x *BPFArg_Filter) String() string {
 func (*BPFArg_Filter) ProtoMessage() {}
 
 func (x *BPFArg_Filter) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[119]
+	mi := &file_module_msg_proto_msgTypes[122]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6868,7 +7089,7 @@ func (x *BPFArg_Filter) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BPFArg_Filter.ProtoReflect.Descriptor instead.
 func (*BPFArg_Filter) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{37, 0}
+	return file_module_msg_proto_rawDescGZIP(), []int{39, 0}
 }
 
 func (x *BPFArg_Filter) GetPriority() int64 {
@@ -6908,7 +7129,7 @@ type GenericEncapArg_EncapField struct {
 
 func (x *GenericEncapArg_EncapField) Reset() {
 	*x = GenericEncapArg_EncapField{}
-	mi := &file_module_msg_proto_msgTypes[120]
+	mi := &file_module_msg_proto_msgTypes[123]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6921,7 +7142,7 @@ func (x *GenericEncapArg_EncapField) String() string {
 func (*GenericEncapArg_EncapField) ProtoMessage() {}
 
 func (x *GenericEncapArg_EncapField) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[120]
+	mi := &file_module_msg_proto_msgTypes[123]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6934,7 +7155,7 @@ func (x *GenericEncapArg_EncapField) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GenericEncapArg_EncapField.ProtoReflect.Descriptor instead.
 func (*GenericEncapArg_EncapField) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{46, 0}
+	return file_module_msg_proto_rawDescGZIP(), []int{48, 0}
 }
 
 func (x *GenericEncapArg_EncapField) GetSize() uint64 {
@@ -6998,7 +7219,7 @@ type NATArg_PortRange struct {
 
 func (x *NATArg_PortRange) Reset() {
 	*x = NATArg_PortRange{}
-	mi := &file_module_msg_proto_msgTypes[124]
+	mi := &file_module_msg_proto_msgTypes[127]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7011,7 +7232,7 @@ func (x *NATArg_PortRange) String() string {
 func (*NATArg_PortRange) ProtoMessage() {}
 
 func (x *NATArg_PortRange) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[124]
+	mi := &file_module_msg_proto_msgTypes[127]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7024,7 +7245,7 @@ func (x *NATArg_PortRange) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NATArg_PortRange.ProtoReflect.Descriptor instead.
 func (*NATArg_PortRange) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{55, 0}
+	return file_module_msg_proto_rawDescGZIP(), []int{58, 0}
 }
 
 func (x *NATArg_PortRange) GetBegin() uint32 {
@@ -7058,7 +7279,7 @@ type NATArg_ExternalAddress struct {
 
 func (x *NATArg_ExternalAddress) Reset() {
 	*x = NATArg_ExternalAddress{}
-	mi := &file_module_msg_proto_msgTypes[125]
+	mi := &file_module_msg_proto_msgTypes[128]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7071,7 +7292,7 @@ func (x *NATArg_ExternalAddress) String() string {
 func (*NATArg_ExternalAddress) ProtoMessage() {}
 
 func (x *NATArg_ExternalAddress) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[125]
+	mi := &file_module_msg_proto_msgTypes[128]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7084,7 +7305,7 @@ func (x *NATArg_ExternalAddress) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NATArg_ExternalAddress.ProtoReflect.Descriptor instead.
 func (*NATArg_ExternalAddress) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{55, 1}
+	return file_module_msg_proto_rawDescGZIP(), []int{58, 1}
 }
 
 func (x *NATArg_ExternalAddress) GetExtAddr() string {
@@ -7111,7 +7332,7 @@ type StaticNATArg_AddressRange struct {
 
 func (x *StaticNATArg_AddressRange) Reset() {
 	*x = StaticNATArg_AddressRange{}
-	mi := &file_module_msg_proto_msgTypes[126]
+	mi := &file_module_msg_proto_msgTypes[129]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7124,7 +7345,7 @@ func (x *StaticNATArg_AddressRange) String() string {
 func (*StaticNATArg_AddressRange) ProtoMessage() {}
 
 func (x *StaticNATArg_AddressRange) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[126]
+	mi := &file_module_msg_proto_msgTypes[129]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7137,7 +7358,7 @@ func (x *StaticNATArg_AddressRange) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StaticNATArg_AddressRange.ProtoReflect.Descriptor instead.
 func (*StaticNATArg_AddressRange) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{56, 0}
+	return file_module_msg_proto_rawDescGZIP(), []int{59, 0}
 }
 
 func (x *StaticNATArg_AddressRange) GetStart() string {
@@ -7164,7 +7385,7 @@ type StaticNATArg_AddressRangePair struct {
 
 func (x *StaticNATArg_AddressRangePair) Reset() {
 	*x = StaticNATArg_AddressRangePair{}
-	mi := &file_module_msg_proto_msgTypes[127]
+	mi := &file_module_msg_proto_msgTypes[130]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7177,7 +7398,7 @@ func (x *StaticNATArg_AddressRangePair) String() string {
 func (*StaticNATArg_AddressRangePair) ProtoMessage() {}
 
 func (x *StaticNATArg_AddressRangePair) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[127]
+	mi := &file_module_msg_proto_msgTypes[130]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7190,7 +7411,7 @@ func (x *StaticNATArg_AddressRangePair) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StaticNATArg_AddressRangePair.ProtoReflect.Descriptor instead.
 func (*StaticNATArg_AddressRangePair) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{56, 1}
+	return file_module_msg_proto_rawDescGZIP(), []int{59, 1}
 }
 
 func (x *StaticNATArg_AddressRangePair) GetIntRange() *StaticNATArg_AddressRange {
@@ -7222,7 +7443,7 @@ type RandomUpdateArg_Field struct {
 
 func (x *RandomUpdateArg_Field) Reset() {
 	*x = RandomUpdateArg_Field{}
-	mi := &file_module_msg_proto_msgTypes[128]
+	mi := &file_module_msg_proto_msgTypes[131]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7235,7 +7456,7 @@ func (x *RandomUpdateArg_Field) String() string {
 func (*RandomUpdateArg_Field) ProtoMessage() {}
 
 func (x *RandomUpdateArg_Field) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[128]
+	mi := &file_module_msg_proto_msgTypes[131]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7248,7 +7469,7 @@ func (x *RandomUpdateArg_Field) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RandomUpdateArg_Field.ProtoReflect.Descriptor instead.
 func (*RandomUpdateArg_Field) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{66, 0}
+	return file_module_msg_proto_rawDescGZIP(), []int{69, 0}
 }
 
 func (x *RandomUpdateArg_Field) GetOffset() int64 {
@@ -7305,7 +7526,7 @@ type SetMetadataArg_Attribute struct {
 
 func (x *SetMetadataArg_Attribute) Reset() {
 	*x = SetMetadataArg_Attribute{}
-	mi := &file_module_msg_proto_msgTypes[129]
+	mi := &file_module_msg_proto_msgTypes[132]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7318,7 +7539,7 @@ func (x *SetMetadataArg_Attribute) String() string {
 func (*SetMetadataArg_Attribute) ProtoMessage() {}
 
 func (x *SetMetadataArg_Attribute) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[129]
+	mi := &file_module_msg_proto_msgTypes[132]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7331,7 +7552,7 @@ func (x *SetMetadataArg_Attribute) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetMetadataArg_Attribute.ProtoReflect.Descriptor instead.
 func (*SetMetadataArg_Attribute) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{73, 0}
+	return file_module_msg_proto_rawDescGZIP(), []int{76, 0}
 }
 
 func (x *SetMetadataArg_Attribute) GetName() string {
@@ -7426,7 +7647,7 @@ type UpdateArg_Field struct {
 
 func (x *UpdateArg_Field) Reset() {
 	*x = UpdateArg_Field{}
-	mi := &file_module_msg_proto_msgTypes[130]
+	mi := &file_module_msg_proto_msgTypes[133]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7439,7 +7660,7 @@ func (x *UpdateArg_Field) String() string {
 func (*UpdateArg_Field) ProtoMessage() {}
 
 func (x *UpdateArg_Field) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[130]
+	mi := &file_module_msg_proto_msgTypes[133]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7452,7 +7673,7 @@ func (x *UpdateArg_Field) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateArg_Field.ProtoReflect.Descriptor instead.
 func (*UpdateArg_Field) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{89, 0}
+	return file_module_msg_proto_rawDescGZIP(), []int{92, 0}
 }
 
 func (x *UpdateArg_Field) GetOffset() int64 {
@@ -7488,7 +7709,7 @@ type UrlFilterArg_Url struct {
 
 func (x *UrlFilterArg_Url) Reset() {
 	*x = UrlFilterArg_Url{}
-	mi := &file_module_msg_proto_msgTypes[131]
+	mi := &file_module_msg_proto_msgTypes[134]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7501,7 +7722,7 @@ func (x *UrlFilterArg_Url) String() string {
 func (*UrlFilterArg_Url) ProtoMessage() {}
 
 func (x *UrlFilterArg_Url) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[131]
+	mi := &file_module_msg_proto_msgTypes[134]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7514,7 +7735,7 @@ func (x *UrlFilterArg_Url) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UrlFilterArg_Url.ProtoReflect.Descriptor instead.
 func (*UrlFilterArg_Url) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{90, 0}
+	return file_module_msg_proto_rawDescGZIP(), []int{93, 0}
 }
 
 func (x *UrlFilterArg_Url) GetHost() string {
@@ -7549,7 +7770,7 @@ type WildcardMatchArg_IndexSet struct {
 
 func (x *WildcardMatchArg_IndexSet) Reset() {
 	*x = WildcardMatchArg_IndexSet{}
-	mi := &file_module_msg_proto_msgTypes[132]
+	mi := &file_module_msg_proto_msgTypes[135]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7562,7 +7783,7 @@ func (x *WildcardMatchArg_IndexSet) String() string {
 func (*WildcardMatchArg_IndexSet) ProtoMessage() {}
 
 func (x *WildcardMatchArg_IndexSet) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[132]
+	mi := &file_module_msg_proto_msgTypes[135]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7575,7 +7796,7 @@ func (x *WildcardMatchArg_IndexSet) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WildcardMatchArg_IndexSet.ProtoReflect.Descriptor instead.
 func (*WildcardMatchArg_IndexSet) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{97, 0}
+	return file_module_msg_proto_rawDescGZIP(), []int{100, 0}
 }
 
 func (x *WildcardMatchArg_IndexSet) GetFields() []uint32 {
@@ -7613,7 +7834,7 @@ type FlowMeasureReadResponse_Statistic struct {
 
 func (x *FlowMeasureReadResponse_Statistic) Reset() {
 	*x = FlowMeasureReadResponse_Statistic{}
-	mi := &file_module_msg_proto_msgTypes[134]
+	mi := &file_module_msg_proto_msgTypes[137]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7626,7 +7847,7 @@ func (x *FlowMeasureReadResponse_Statistic) String() string {
 func (*FlowMeasureReadResponse_Statistic) ProtoMessage() {}
 
 func (x *FlowMeasureReadResponse_Statistic) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[134]
+	mi := &file_module_msg_proto_msgTypes[137]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7639,7 +7860,7 @@ func (x *FlowMeasureReadResponse_Statistic) ProtoReflect() protoreflect.Message 
 
 // Deprecated: Use FlowMeasureReadResponse_Statistic.ProtoReflect.Descriptor instead.
 func (*FlowMeasureReadResponse_Statistic) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{109, 0}
+	return file_module_msg_proto_rawDescGZIP(), []int{112, 0}
 }
 
 func (x *FlowMeasureReadResponse_Statistic) GetFseid() uint64 {
@@ -7700,7 +7921,7 @@ type FlowMeasureReadResponse_Statistic_Histogram struct {
 
 func (x *FlowMeasureReadResponse_Statistic_Histogram) Reset() {
 	*x = FlowMeasureReadResponse_Statistic_Histogram{}
-	mi := &file_module_msg_proto_msgTypes[135]
+	mi := &file_module_msg_proto_msgTypes[138]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7713,7 +7934,7 @@ func (x *FlowMeasureReadResponse_Statistic_Histogram) String() string {
 func (*FlowMeasureReadResponse_Statistic_Histogram) ProtoMessage() {}
 
 func (x *FlowMeasureReadResponse_Statistic_Histogram) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[135]
+	mi := &file_module_msg_proto_msgTypes[138]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7726,7 +7947,7 @@ func (x *FlowMeasureReadResponse_Statistic_Histogram) ProtoReflect() protoreflec
 
 // Deprecated: Use FlowMeasureReadResponse_Statistic_Histogram.ProtoReflect.Descriptor instead.
 func (*FlowMeasureReadResponse_Statistic_Histogram) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{109, 0, 0}
+	return file_module_msg_proto_rawDescGZIP(), []int{112, 0, 0}
 }
 
 func (x *FlowMeasureReadResponse_Statistic_Histogram) GetCount() uint64 {
@@ -7792,13 +8013,14 @@ type GtpuPathMonitoringCommandReadResponse_Statistic struct {
 	LatencyMin    uint64                 `protobuf:"varint,3,opt,name=latency_min,json=latencyMin,proto3" json:"latency_min,omitempty"`    /// minimum latency
 	LatencyMean   uint64                 `protobuf:"varint,4,opt,name=latency_mean,json=latencyMean,proto3" json:"latency_mean,omitempty"` /// average latency
 	LatencyMax    uint64                 `protobuf:"varint,5,opt,name=latency_max,json=latencyMax,proto3" json:"latency_max,omitempty"`    /// maximum latency
+	GnbIp6        []byte                 `protobuf:"bytes,6,opt,name=gnb_ip6,json=gnbIp6,proto3" json:"gnb_ip6,omitempty"`                 /// gNB IPv6 address (16 bytes), or empty
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *GtpuPathMonitoringCommandReadResponse_Statistic) Reset() {
 	*x = GtpuPathMonitoringCommandReadResponse_Statistic{}
-	mi := &file_module_msg_proto_msgTypes[136]
+	mi := &file_module_msg_proto_msgTypes[139]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7811,7 +8033,7 @@ func (x *GtpuPathMonitoringCommandReadResponse_Statistic) String() string {
 func (*GtpuPathMonitoringCommandReadResponse_Statistic) ProtoMessage() {}
 
 func (x *GtpuPathMonitoringCommandReadResponse_Statistic) ProtoReflect() protoreflect.Message {
-	mi := &file_module_msg_proto_msgTypes[136]
+	mi := &file_module_msg_proto_msgTypes[139]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7824,7 +8046,7 @@ func (x *GtpuPathMonitoringCommandReadResponse_Statistic) ProtoReflect() protore
 
 // Deprecated: Use GtpuPathMonitoringCommandReadResponse_Statistic.ProtoReflect.Descriptor instead.
 func (*GtpuPathMonitoringCommandReadResponse_Statistic) Descriptor() ([]byte, []int) {
-	return file_module_msg_proto_rawDescGZIP(), []int{115, 0}
+	return file_module_msg_proto_rawDescGZIP(), []int{118, 0}
 }
 
 func (x *GtpuPathMonitoringCommandReadResponse_Statistic) GetGnbIp() uint32 {
@@ -7862,6 +8084,13 @@ func (x *GtpuPathMonitoringCommandReadResponse_Statistic) GetLatencyMax() uint64
 	return 0
 }
 
+func (x *GtpuPathMonitoringCommandReadResponse_Statistic) GetGnbIp6() []byte {
+	if x != nil {
+		return x.GnbIp6
+	}
+	return nil
+}
+
 var File_module_msg_proto protoreflect.FileDescriptor
 
 const file_module_msg_proto_rawDesc = "" +
@@ -7895,7 +8124,16 @@ const file_module_msg_proto_rawDesc = "" +
 	"\x06prefix\x18\x01 \x01(\tR\x06prefix\x12\x1d\n" +
 	"\n" +
 	"prefix_len\x18\x02 \x01(\x04R\tprefixLen\"\x19\n" +
-	"\x17IPLookupCommandClearArg\"\x8a\x01\n" +
+	"\x17IPLookupCommandClearArg\"c\n" +
+	"\x16IP6LookupCommandAddArg\x12\x16\n" +
+	"\x06prefix\x18\x01 \x01(\tR\x06prefix\x12\x1d\n" +
+	"\n" +
+	"prefix_len\x18\x02 \x01(\x04R\tprefixLen\x12\x12\n" +
+	"\x04gate\x18\x03 \x01(\x04R\x04gate\"R\n" +
+	"\x19IP6LookupCommandDeleteArg\x12\x16\n" +
+	"\x06prefix\x18\x01 \x01(\tR\x06prefix\x12\x1d\n" +
+	"\n" +
+	"prefix_len\x18\x02 \x01(\x04R\tprefixLen\"\x8a\x01\n" +
 	"\x16L2ForwardCommandAddArg\x12?\n" +
 	"\aentries\x18\x01 \x03(\v2%.bess.pb.L2ForwardCommandAddArg.EntryR\aentries\x1a/\n" +
 	"\x05Entry\x12\x12\n" +
@@ -8038,6 +8276,9 @@ const file_module_msg_proto_rawDesc = "" +
 	"IPEncapArg\"G\n" +
 	"\vIPLookupArg\x12\x1b\n" +
 	"\tmax_rules\x18\x01 \x01(\rR\bmaxRules\x12\x1b\n" +
+	"\tmax_tbl8s\x18\x02 \x01(\rR\bmaxTbl8s\"H\n" +
+	"\fIP6LookupArg\x12\x1b\n" +
+	"\tmax_rules\x18\x01 \x01(\rR\bmaxRules\x12\x1b\n" +
 	"\tmax_tbl8s\x18\x02 \x01(\rR\bmaxTbl8s\":\n" +
 	"\fL2ForwardArg\x12\x12\n" +
 	"\x04size\x18\x01 \x01(\x03R\x04size\x12\x16\n" +
@@ -8157,10 +8398,11 @@ const file_module_msg_proto_rawDesc = "" +
 	"\x02hw\x18\x02 \x01(\bR\x02hw\"7\n" +
 	"\rL4ChecksumArg\x12\x16\n" +
 	"\x06verify\x18\x01 \x01(\bR\x06verify\x12\x0e\n" +
-	"\x02hw\x18\x02 \x01(\bR\x02hw\"+\n" +
+	"\x02hw\x18\x02 \x01(\bR\x02hw\"?\n" +
 	"\vGtpuEchoArg\x12\x1c\n" +
 	"\n" +
-	"s1u_sgw_ip\x18\x01 \x01(\rR\bs1uSgwIp\">\n" +
+	"s1u_sgw_ip\x18\x01 \x01(\rR\bs1uSgwIp\x12\x12\n" +
+	"\x04ipv6\x18\x02 \x01(\bR\x04ipv6\">\n" +
 	"\vIPDefragArg\x12\x1b\n" +
 	"\tnum_flows\x18\x01 \x01(\rR\bnumFlows\x12\x12\n" +
 	"\x04numa\x18\x02 \x01(\x05R\x04numa\"\x1d\n" +
@@ -8175,9 +8417,12 @@ const file_module_msg_proto_rawDesc = "" +
 	"\aname_id\x18\x01 \x01(\tR\x06nameId\x12\x1f\n" +
 	"\vcheck_exist\x18\x02 \x01(\bR\n" +
 	"checkExist\x12\x14\n" +
-	"\x05total\x18\x03 \x01(\rR\x05total\"'\n" +
+	"\x05total\x18\x03 \x01(\rR\x05total\"a\n" +
 	"\fGtpuEncapArg\x12\x17\n" +
-	"\aadd_psc\x18\x01 \x01(\bR\x06addPsc\"`\n" +
+	"\aadd_psc\x18\x01 \x01(\bR\x06addPsc\x12\x1d\n" +
+	"\n" +
+	"access_ip6\x18\x02 \x01(\tR\taccessIp6\x12\x19\n" +
+	"\bcore_ip6\x18\x03 \x01(\tR\acoreIp6\"`\n" +
 	"\bSplitArg\x12\x12\n" +
 	"\x04size\x18\x01 \x01(\x04R\x04size\x12\x1e\n" +
 	"\tattribute\x18\x02 \x01(\tH\x00R\tattribute\x12\x18\n" +
@@ -8293,16 +8538,17 @@ const file_module_msg_proto_rawDesc = "" +
 	"\x14percentile_values_ns\x18\a \x03(\x04R\x12percentileValuesNs\"\x1b\n" +
 	"\x19FlowMeasureCommandFlipArg\"4\n" +
 	"\x17FlowMeasureFlipResponse\x12\x19\n" +
-	"\bold_flag\x18\x01 \x01(\x04R\aoldFlag\">\n" +
+	"\bold_flag\x18\x01 \x01(\x04R\aoldFlag\"W\n" +
 	"%GtpuPathMonitoringCommandAddDeleteArg\x12\x15\n" +
-	"\x06gnb_ip\x18\x01 \x01(\rR\x05gnbIp\"#\n" +
+	"\x06gnb_ip\x18\x01 \x01(\rR\x05gnbIp\x12\x17\n" +
+	"\agnb_ip6\x18\x02 \x01(\fR\x06gnbIp6\"#\n" +
 	"!GtpuPathMonitoringCommandClearArg\"8\n" +
 	" GtpuPathMonitoringCommandReadArg\x12\x14\n" +
-	"\x05clear\x18\x01 \x01(\bR\x05clear\"\xa1\x02\n" +
+	"\x05clear\x18\x01 \x01(\bR\x05clear\"\xba\x02\n" +
 	"%GtpuPathMonitoringCommandReadResponse\x12X\n" +
 	"\n" +
 	"statistics\x18\x01 \x03(\v28.bess.pb.GtpuPathMonitoringCommandReadResponse.StatisticR\n" +
-	"statistics\x1a\x9d\x01\n" +
+	"statistics\x1a\xb6\x01\n" +
 	"\tStatistic\x12\x15\n" +
 	"\x06gnb_ip\x18\x01 \x01(\rR\x05gnbIp\x12\x14\n" +
 	"\x05count\x18\x02 \x01(\x04R\x05count\x12\x1f\n" +
@@ -8310,7 +8556,8 @@ const file_module_msg_proto_rawDesc = "" +
 	"latencyMin\x12!\n" +
 	"\flatency_mean\x18\x04 \x01(\x04R\vlatencyMean\x12\x1f\n" +
 	"\vlatency_max\x18\x05 \x01(\x04R\n" +
-	"latencyMaxB3Z1github.com/omec-project/upf-epc/pfcpiface/bess_pbb\x06proto3"
+	"latencyMax\x12\x17\n" +
+	"\agnb_ip6\x18\x06 \x01(\fR\x06gnbIp6B3Z1github.com/omec-project/upf-epc/pfcpiface/bess_pbb\x06proto3"
 
 var (
 	file_module_msg_proto_rawDescOnce sync.Once
@@ -8324,7 +8571,7 @@ func file_module_msg_proto_rawDescGZIP() []byte {
 	return file_module_msg_proto_rawDescData
 }
 
-var file_module_msg_proto_msgTypes = make([]protoimpl.MessageInfo, 137)
+var file_module_msg_proto_msgTypes = make([]protoimpl.MessageInfo, 140)
 var file_module_msg_proto_goTypes = []any{
 	(*EmptyArg)(nil),                                        // 0: bess.pb.EmptyArg
 	(*BPFCommandClearArg)(nil),                              // 1: bess.pb.BPFCommandClearArg
@@ -8338,184 +8585,187 @@ var file_module_msg_proto_goTypes = []any{
 	(*IPLookupCommandAddArg)(nil),                           // 9: bess.pb.IPLookupCommandAddArg
 	(*IPLookupCommandDeleteArg)(nil),                        // 10: bess.pb.IPLookupCommandDeleteArg
 	(*IPLookupCommandClearArg)(nil),                         // 11: bess.pb.IPLookupCommandClearArg
-	(*L2ForwardCommandAddArg)(nil),                          // 12: bess.pb.L2ForwardCommandAddArg
-	(*L2ForwardCommandDeleteArg)(nil),                       // 13: bess.pb.L2ForwardCommandDeleteArg
-	(*L2ForwardCommandSetDefaultGateArg)(nil),               // 14: bess.pb.L2ForwardCommandSetDefaultGateArg
-	(*L2ForwardCommandLookupArg)(nil),                       // 15: bess.pb.L2ForwardCommandLookupArg
-	(*L2ForwardCommandLookupResponse)(nil),                  // 16: bess.pb.L2ForwardCommandLookupResponse
-	(*L2ForwardCommandPopulateArg)(nil),                     // 17: bess.pb.L2ForwardCommandPopulateArg
-	(*MeasureCommandGetSummaryArg)(nil),                     // 18: bess.pb.MeasureCommandGetSummaryArg
-	(*MeasureCommandGetSummaryResponse)(nil),                // 19: bess.pb.MeasureCommandGetSummaryResponse
-	(*DRRArg)(nil),                                          // 20: bess.pb.DRRArg
-	(*DRRQuantumArg)(nil),                                   // 21: bess.pb.DRRQuantumArg
-	(*DRRMaxFlowQueueSizeArg)(nil),                          // 22: bess.pb.DRRMaxFlowQueueSizeArg
-	(*PortIncCommandSetBurstArg)(nil),                       // 23: bess.pb.PortIncCommandSetBurstArg
-	(*QueueIncCommandSetBurstArg)(nil),                      // 24: bess.pb.QueueIncCommandSetBurstArg
-	(*QueueCommandSetBurstArg)(nil),                         // 25: bess.pb.QueueCommandSetBurstArg
-	(*QueueCommandSetSizeArg)(nil),                          // 26: bess.pb.QueueCommandSetSizeArg
-	(*QueueCommandGetStatusArg)(nil),                        // 27: bess.pb.QueueCommandGetStatusArg
-	(*QueueCommandGetStatusResponse)(nil),                   // 28: bess.pb.QueueCommandGetStatusResponse
-	(*RandomUpdateCommandClearArg)(nil),                     // 29: bess.pb.RandomUpdateCommandClearArg
-	(*RewriteCommandClearArg)(nil),                          // 30: bess.pb.RewriteCommandClearArg
-	(*UpdateCommandClearArg)(nil),                           // 31: bess.pb.UpdateCommandClearArg
-	(*WildcardMatchCommandAddArg)(nil),                      // 32: bess.pb.WildcardMatchCommandAddArg
-	(*WildcardMatchCommandDeleteArg)(nil),                   // 33: bess.pb.WildcardMatchCommandDeleteArg
-	(*WildcardMatchCommandClearArg)(nil),                    // 34: bess.pb.WildcardMatchCommandClearArg
-	(*WildcardMatchCommandSetDefaultGateArg)(nil),           // 35: bess.pb.WildcardMatchCommandSetDefaultGateArg
-	(*ACLArg)(nil),                                          // 36: bess.pb.ACLArg
-	(*BPFArg)(nil),                                          // 37: bess.pb.BPFArg
-	(*BufferArg)(nil),                                       // 38: bess.pb.BufferArg
-	(*BypassArg)(nil),                                       // 39: bess.pb.BypassArg
-	(*DumpArg)(nil),                                         // 40: bess.pb.DumpArg
-	(*EtherEncapArg)(nil),                                   // 41: bess.pb.EtherEncapArg
-	(*ExactMatchArg)(nil),                                   // 42: bess.pb.ExactMatchArg
-	(*ExactMatchConfig)(nil),                                // 43: bess.pb.ExactMatchConfig
-	(*FlowGenArg)(nil),                                      // 44: bess.pb.FlowGenArg
-	(*GenericDecapArg)(nil),                                 // 45: bess.pb.GenericDecapArg
-	(*GenericEncapArg)(nil),                                 // 46: bess.pb.GenericEncapArg
-	(*HashLBArg)(nil),                                       // 47: bess.pb.HashLBArg
-	(*IPEncapArg)(nil),                                      // 48: bess.pb.IPEncapArg
-	(*IPLookupArg)(nil),                                     // 49: bess.pb.IPLookupArg
-	(*L2ForwardArg)(nil),                                    // 50: bess.pb.L2ForwardArg
-	(*MACSwapArg)(nil),                                      // 51: bess.pb.MACSwapArg
-	(*MeasureArg)(nil),                                      // 52: bess.pb.MeasureArg
-	(*MergeArg)(nil),                                        // 53: bess.pb.MergeArg
-	(*MetadataTestArg)(nil),                                 // 54: bess.pb.MetadataTestArg
-	(*NATArg)(nil),                                          // 55: bess.pb.NATArg
-	(*StaticNATArg)(nil),                                    // 56: bess.pb.StaticNATArg
-	(*NoOpArg)(nil),                                         // 57: bess.pb.NoOpArg
-	(*PortIncArg)(nil),                                      // 58: bess.pb.PortIncArg
-	(*PortOutArg)(nil),                                      // 59: bess.pb.PortOutArg
-	(*QueueIncArg)(nil),                                     // 60: bess.pb.QueueIncArg
-	(*QueueOutArg)(nil),                                     // 61: bess.pb.QueueOutArg
-	(*QueueArg)(nil),                                        // 62: bess.pb.QueueArg
-	(*RandomSplitArg)(nil),                                  // 63: bess.pb.RandomSplitArg
-	(*RandomSplitCommandSetDroprateArg)(nil),                // 64: bess.pb.RandomSplitCommandSetDroprateArg
-	(*RandomSplitCommandSetGatesArg)(nil),                   // 65: bess.pb.RandomSplitCommandSetGatesArg
-	(*RandomUpdateArg)(nil),                                 // 66: bess.pb.RandomUpdateArg
-	(*RewriteArg)(nil),                                      // 67: bess.pb.RewriteArg
-	(*RoundRobinCommandSetGatesArg)(nil),                    // 68: bess.pb.RoundRobinCommandSetGatesArg
-	(*RoundRobinCommandSetModeArg)(nil),                     // 69: bess.pb.RoundRobinCommandSetModeArg
-	(*RoundRobinArg)(nil),                                   // 70: bess.pb.RoundRobinArg
-	(*ReplicateArg)(nil),                                    // 71: bess.pb.ReplicateArg
-	(*ReplicateCommandSetGatesArg)(nil),                     // 72: bess.pb.ReplicateCommandSetGatesArg
-	(*SetMetadataArg)(nil),                                  // 73: bess.pb.SetMetadataArg
-	(*SinkArg)(nil),                                         // 74: bess.pb.SinkArg
-	(*SourceCommandSetBurstArg)(nil),                        // 75: bess.pb.SourceCommandSetBurstArg
-	(*SourceCommandSetPktSizeArg)(nil),                      // 76: bess.pb.SourceCommandSetPktSizeArg
-	(*SourceArg)(nil),                                       // 77: bess.pb.SourceArg
-	(*IPChecksumArg)(nil),                                   // 78: bess.pb.IPChecksumArg
-	(*L4ChecksumArg)(nil),                                   // 79: bess.pb.L4ChecksumArg
-	(*GtpuEchoArg)(nil),                                     // 80: bess.pb.GtpuEchoArg
-	(*IPDefragArg)(nil),                                     // 81: bess.pb.IPDefragArg
-	(*IPFragArg)(nil),                                       // 82: bess.pb.IPFragArg
-	(*CounterAddArg)(nil),                                   // 83: bess.pb.CounterAddArg
-	(*CounterRemoveArg)(nil),                                // 84: bess.pb.CounterRemoveArg
-	(*CounterArg)(nil),                                      // 85: bess.pb.CounterArg
-	(*GtpuEncapArg)(nil),                                    // 86: bess.pb.GtpuEncapArg
-	(*SplitArg)(nil),                                        // 87: bess.pb.SplitArg
-	(*TimestampArg)(nil),                                    // 88: bess.pb.TimestampArg
-	(*UpdateArg)(nil),                                       // 89: bess.pb.UpdateArg
-	(*UrlFilterArg)(nil),                                    // 90: bess.pb.UrlFilterArg
-	(*UrlFilterConfig)(nil),                                 // 91: bess.pb.UrlFilterConfig
-	(*VLANPopArg)(nil),                                      // 92: bess.pb.VLANPopArg
-	(*VLANPushArg)(nil),                                     // 93: bess.pb.VLANPushArg
-	(*VLANSplitArg)(nil),                                    // 94: bess.pb.VLANSplitArg
-	(*VXLANDecapArg)(nil),                                   // 95: bess.pb.VXLANDecapArg
-	(*VXLANEncapArg)(nil),                                   // 96: bess.pb.VXLANEncapArg
-	(*WildcardMatchArg)(nil),                                // 97: bess.pb.WildcardMatchArg
-	(*WildcardMatchConfig)(nil),                             // 98: bess.pb.WildcardMatchConfig
-	(*ArpResponderArg)(nil),                                 // 99: bess.pb.ArpResponderArg
-	(*MplsPopArg)(nil),                                      // 100: bess.pb.MplsPopArg
-	(*WorkerSplitArg)(nil),                                  // 101: bess.pb.WorkerSplitArg
-	(*QosArg)(nil),                                          // 102: bess.pb.QosArg
-	(*QosCommandAddArg)(nil),                                // 103: bess.pb.QosCommandAddArg
-	(*QosCommandDeleteArg)(nil),                             // 104: bess.pb.QosCommandDeleteArg
-	(*QosCommandClearArg)(nil),                              // 105: bess.pb.QosCommandClearArg
-	(*QosCommandSetDefaultGateArg)(nil),                     // 106: bess.pb.QosCommandSetDefaultGateArg
-	(*FlowMeasureArg)(nil),                                  // 107: bess.pb.FlowMeasureArg
-	(*FlowMeasureCommandReadArg)(nil),                       // 108: bess.pb.FlowMeasureCommandReadArg
-	(*FlowMeasureReadResponse)(nil),                         // 109: bess.pb.FlowMeasureReadResponse
-	(*FlowMeasureCommandFlipArg)(nil),                       // 110: bess.pb.FlowMeasureCommandFlipArg
-	(*FlowMeasureFlipResponse)(nil),                         // 111: bess.pb.FlowMeasureFlipResponse
-	(*GtpuPathMonitoringCommandAddDeleteArg)(nil),           // 112: bess.pb.GtpuPathMonitoringCommandAddDeleteArg
-	(*GtpuPathMonitoringCommandClearArg)(nil),               // 113: bess.pb.GtpuPathMonitoringCommandClearArg
-	(*GtpuPathMonitoringCommandReadArg)(nil),                // 114: bess.pb.GtpuPathMonitoringCommandReadArg
-	(*GtpuPathMonitoringCommandReadResponse)(nil),           // 115: bess.pb.GtpuPathMonitoringCommandReadResponse
-	(*L2ForwardCommandAddArg_Entry)(nil),                    // 116: bess.pb.L2ForwardCommandAddArg.Entry
-	(*MeasureCommandGetSummaryResponse_Histogram)(nil),      // 117: bess.pb.MeasureCommandGetSummaryResponse.Histogram
-	(*ACLArg_Rule)(nil),                                     // 118: bess.pb.ACLArg.Rule
-	(*BPFArg_Filter)(nil),                                   // 119: bess.pb.BPFArg.Filter
-	(*GenericEncapArg_EncapField)(nil),                      // 120: bess.pb.GenericEncapArg.EncapField
-	nil,                                                     // 121: bess.pb.MetadataTestArg.ReadEntry
-	nil,                                                     // 122: bess.pb.MetadataTestArg.WriteEntry
-	nil,                                                     // 123: bess.pb.MetadataTestArg.UpdateEntry
-	(*NATArg_PortRange)(nil),                                // 124: bess.pb.NATArg.PortRange
-	(*NATArg_ExternalAddress)(nil),                          // 125: bess.pb.NATArg.ExternalAddress
-	(*StaticNATArg_AddressRange)(nil),                       // 126: bess.pb.StaticNATArg.AddressRange
-	(*StaticNATArg_AddressRangePair)(nil),                   // 127: bess.pb.StaticNATArg.AddressRangePair
-	(*RandomUpdateArg_Field)(nil),                           // 128: bess.pb.RandomUpdateArg.Field
-	(*SetMetadataArg_Attribute)(nil),                        // 129: bess.pb.SetMetadataArg.Attribute
-	(*UpdateArg_Field)(nil),                                 // 130: bess.pb.UpdateArg.Field
-	(*UrlFilterArg_Url)(nil),                                // 131: bess.pb.UrlFilterArg.Url
-	(*WildcardMatchArg_IndexSet)(nil),                       // 132: bess.pb.WildcardMatchArg.IndexSet
-	nil,                                                     // 133: bess.pb.WorkerSplitArg.WorkerGatesEntry
-	(*FlowMeasureReadResponse_Statistic)(nil),               // 134: bess.pb.FlowMeasureReadResponse.Statistic
-	(*FlowMeasureReadResponse_Statistic_Histogram)(nil),     // 135: bess.pb.FlowMeasureReadResponse.Statistic.Histogram
-	(*GtpuPathMonitoringCommandReadResponse_Statistic)(nil), // 136: bess.pb.GtpuPathMonitoringCommandReadResponse.Statistic
-	(*FieldData)(nil),                                       // 137: bess.pb.FieldData
-	(*Field)(nil),                                           // 138: bess.pb.Field
+	(*IP6LookupCommandAddArg)(nil),                          // 12: bess.pb.IP6LookupCommandAddArg
+	(*IP6LookupCommandDeleteArg)(nil),                       // 13: bess.pb.IP6LookupCommandDeleteArg
+	(*L2ForwardCommandAddArg)(nil),                          // 14: bess.pb.L2ForwardCommandAddArg
+	(*L2ForwardCommandDeleteArg)(nil),                       // 15: bess.pb.L2ForwardCommandDeleteArg
+	(*L2ForwardCommandSetDefaultGateArg)(nil),               // 16: bess.pb.L2ForwardCommandSetDefaultGateArg
+	(*L2ForwardCommandLookupArg)(nil),                       // 17: bess.pb.L2ForwardCommandLookupArg
+	(*L2ForwardCommandLookupResponse)(nil),                  // 18: bess.pb.L2ForwardCommandLookupResponse
+	(*L2ForwardCommandPopulateArg)(nil),                     // 19: bess.pb.L2ForwardCommandPopulateArg
+	(*MeasureCommandGetSummaryArg)(nil),                     // 20: bess.pb.MeasureCommandGetSummaryArg
+	(*MeasureCommandGetSummaryResponse)(nil),                // 21: bess.pb.MeasureCommandGetSummaryResponse
+	(*DRRArg)(nil),                                          // 22: bess.pb.DRRArg
+	(*DRRQuantumArg)(nil),                                   // 23: bess.pb.DRRQuantumArg
+	(*DRRMaxFlowQueueSizeArg)(nil),                          // 24: bess.pb.DRRMaxFlowQueueSizeArg
+	(*PortIncCommandSetBurstArg)(nil),                       // 25: bess.pb.PortIncCommandSetBurstArg
+	(*QueueIncCommandSetBurstArg)(nil),                      // 26: bess.pb.QueueIncCommandSetBurstArg
+	(*QueueCommandSetBurstArg)(nil),                         // 27: bess.pb.QueueCommandSetBurstArg
+	(*QueueCommandSetSizeArg)(nil),                          // 28: bess.pb.QueueCommandSetSizeArg
+	(*QueueCommandGetStatusArg)(nil),                        // 29: bess.pb.QueueCommandGetStatusArg
+	(*QueueCommandGetStatusResponse)(nil),                   // 30: bess.pb.QueueCommandGetStatusResponse
+	(*RandomUpdateCommandClearArg)(nil),                     // 31: bess.pb.RandomUpdateCommandClearArg
+	(*RewriteCommandClearArg)(nil),                          // 32: bess.pb.RewriteCommandClearArg
+	(*UpdateCommandClearArg)(nil),                           // 33: bess.pb.UpdateCommandClearArg
+	(*WildcardMatchCommandAddArg)(nil),                      // 34: bess.pb.WildcardMatchCommandAddArg
+	(*WildcardMatchCommandDeleteArg)(nil),                   // 35: bess.pb.WildcardMatchCommandDeleteArg
+	(*WildcardMatchCommandClearArg)(nil),                    // 36: bess.pb.WildcardMatchCommandClearArg
+	(*WildcardMatchCommandSetDefaultGateArg)(nil),           // 37: bess.pb.WildcardMatchCommandSetDefaultGateArg
+	(*ACLArg)(nil),                                          // 38: bess.pb.ACLArg
+	(*BPFArg)(nil),                                          // 39: bess.pb.BPFArg
+	(*BufferArg)(nil),                                       // 40: bess.pb.BufferArg
+	(*BypassArg)(nil),                                       // 41: bess.pb.BypassArg
+	(*DumpArg)(nil),                                         // 42: bess.pb.DumpArg
+	(*EtherEncapArg)(nil),                                   // 43: bess.pb.EtherEncapArg
+	(*ExactMatchArg)(nil),                                   // 44: bess.pb.ExactMatchArg
+	(*ExactMatchConfig)(nil),                                // 45: bess.pb.ExactMatchConfig
+	(*FlowGenArg)(nil),                                      // 46: bess.pb.FlowGenArg
+	(*GenericDecapArg)(nil),                                 // 47: bess.pb.GenericDecapArg
+	(*GenericEncapArg)(nil),                                 // 48: bess.pb.GenericEncapArg
+	(*HashLBArg)(nil),                                       // 49: bess.pb.HashLBArg
+	(*IPEncapArg)(nil),                                      // 50: bess.pb.IPEncapArg
+	(*IPLookupArg)(nil),                                     // 51: bess.pb.IPLookupArg
+	(*IP6LookupArg)(nil),                                    // 52: bess.pb.IP6LookupArg
+	(*L2ForwardArg)(nil),                                    // 53: bess.pb.L2ForwardArg
+	(*MACSwapArg)(nil),                                      // 54: bess.pb.MACSwapArg
+	(*MeasureArg)(nil),                                      // 55: bess.pb.MeasureArg
+	(*MergeArg)(nil),                                        // 56: bess.pb.MergeArg
+	(*MetadataTestArg)(nil),                                 // 57: bess.pb.MetadataTestArg
+	(*NATArg)(nil),                                          // 58: bess.pb.NATArg
+	(*StaticNATArg)(nil),                                    // 59: bess.pb.StaticNATArg
+	(*NoOpArg)(nil),                                         // 60: bess.pb.NoOpArg
+	(*PortIncArg)(nil),                                      // 61: bess.pb.PortIncArg
+	(*PortOutArg)(nil),                                      // 62: bess.pb.PortOutArg
+	(*QueueIncArg)(nil),                                     // 63: bess.pb.QueueIncArg
+	(*QueueOutArg)(nil),                                     // 64: bess.pb.QueueOutArg
+	(*QueueArg)(nil),                                        // 65: bess.pb.QueueArg
+	(*RandomSplitArg)(nil),                                  // 66: bess.pb.RandomSplitArg
+	(*RandomSplitCommandSetDroprateArg)(nil),                // 67: bess.pb.RandomSplitCommandSetDroprateArg
+	(*RandomSplitCommandSetGatesArg)(nil),                   // 68: bess.pb.RandomSplitCommandSetGatesArg
+	(*RandomUpdateArg)(nil),                                 // 69: bess.pb.RandomUpdateArg
+	(*RewriteArg)(nil),                                      // 70: bess.pb.RewriteArg
+	(*RoundRobinCommandSetGatesArg)(nil),                    // 71: bess.pb.RoundRobinCommandSetGatesArg
+	(*RoundRobinCommandSetModeArg)(nil),                     // 72: bess.pb.RoundRobinCommandSetModeArg
+	(*RoundRobinArg)(nil),                                   // 73: bess.pb.RoundRobinArg
+	(*ReplicateArg)(nil),                                    // 74: bess.pb.ReplicateArg
+	(*ReplicateCommandSetGatesArg)(nil),                     // 75: bess.pb.ReplicateCommandSetGatesArg
+	(*SetMetadataArg)(nil),                                  // 76: bess.pb.SetMetadataArg
+	(*SinkArg)(nil),                                         // 77: bess.pb.SinkArg
+	(*SourceCommandSetBurstArg)(nil),                        // 78: bess.pb.SourceCommandSetBurstArg
+	(*SourceCommandSetPktSizeArg)(nil),                      // 79: bess.pb.SourceCommandSetPktSizeArg
+	(*SourceArg)(nil),                                       // 80: bess.pb.SourceArg
+	(*IPChecksumArg)(nil),                                   // 81: bess.pb.IPChecksumArg
+	(*L4ChecksumArg)(nil),                                   // 82: bess.pb.L4ChecksumArg
+	(*GtpuEchoArg)(nil),                                     // 83: bess.pb.GtpuEchoArg
+	(*IPDefragArg)(nil),                                     // 84: bess.pb.IPDefragArg
+	(*IPFragArg)(nil),                                       // 85: bess.pb.IPFragArg
+	(*CounterAddArg)(nil),                                   // 86: bess.pb.CounterAddArg
+	(*CounterRemoveArg)(nil),                                // 87: bess.pb.CounterRemoveArg
+	(*CounterArg)(nil),                                      // 88: bess.pb.CounterArg
+	(*GtpuEncapArg)(nil),                                    // 89: bess.pb.GtpuEncapArg
+	(*SplitArg)(nil),                                        // 90: bess.pb.SplitArg
+	(*TimestampArg)(nil),                                    // 91: bess.pb.TimestampArg
+	(*UpdateArg)(nil),                                       // 92: bess.pb.UpdateArg
+	(*UrlFilterArg)(nil),                                    // 93: bess.pb.UrlFilterArg
+	(*UrlFilterConfig)(nil),                                 // 94: bess.pb.UrlFilterConfig
+	(*VLANPopArg)(nil),                                      // 95: bess.pb.VLANPopArg
+	(*VLANPushArg)(nil),                                     // 96: bess.pb.VLANPushArg
+	(*VLANSplitArg)(nil),                                    // 97: bess.pb.VLANSplitArg
+	(*VXLANDecapArg)(nil),                                   // 98: bess.pb.VXLANDecapArg
+	(*VXLANEncapArg)(nil),                                   // 99: bess.pb.VXLANEncapArg
+	(*WildcardMatchArg)(nil),                                // 100: bess.pb.WildcardMatchArg
+	(*WildcardMatchConfig)(nil),                             // 101: bess.pb.WildcardMatchConfig
+	(*ArpResponderArg)(nil),                                 // 102: bess.pb.ArpResponderArg
+	(*MplsPopArg)(nil),                                      // 103: bess.pb.MplsPopArg
+	(*WorkerSplitArg)(nil),                                  // 104: bess.pb.WorkerSplitArg
+	(*QosArg)(nil),                                          // 105: bess.pb.QosArg
+	(*QosCommandAddArg)(nil),                                // 106: bess.pb.QosCommandAddArg
+	(*QosCommandDeleteArg)(nil),                             // 107: bess.pb.QosCommandDeleteArg
+	(*QosCommandClearArg)(nil),                              // 108: bess.pb.QosCommandClearArg
+	(*QosCommandSetDefaultGateArg)(nil),                     // 109: bess.pb.QosCommandSetDefaultGateArg
+	(*FlowMeasureArg)(nil),                                  // 110: bess.pb.FlowMeasureArg
+	(*FlowMeasureCommandReadArg)(nil),                       // 111: bess.pb.FlowMeasureCommandReadArg
+	(*FlowMeasureReadResponse)(nil),                         // 112: bess.pb.FlowMeasureReadResponse
+	(*FlowMeasureCommandFlipArg)(nil),                       // 113: bess.pb.FlowMeasureCommandFlipArg
+	(*FlowMeasureFlipResponse)(nil),                         // 114: bess.pb.FlowMeasureFlipResponse
+	(*GtpuPathMonitoringCommandAddDeleteArg)(nil),           // 115: bess.pb.GtpuPathMonitoringCommandAddDeleteArg
+	(*GtpuPathMonitoringCommandClearArg)(nil),               // 116: bess.pb.GtpuPathMonitoringCommandClearArg
+	(*GtpuPathMonitoringCommandReadArg)(nil),                // 117: bess.pb.GtpuPathMonitoringCommandReadArg
+	(*GtpuPathMonitoringCommandReadResponse)(nil),           // 118: bess.pb.GtpuPathMonitoringCommandReadResponse
+	(*L2ForwardCommandAddArg_Entry)(nil),                    // 119: bess.pb.L2ForwardCommandAddArg.Entry
+	(*MeasureCommandGetSummaryResponse_Histogram)(nil),      // 120: bess.pb.MeasureCommandGetSummaryResponse.Histogram
+	(*ACLArg_Rule)(nil),                                     // 121: bess.pb.ACLArg.Rule
+	(*BPFArg_Filter)(nil),                                   // 122: bess.pb.BPFArg.Filter
+	(*GenericEncapArg_EncapField)(nil),                      // 123: bess.pb.GenericEncapArg.EncapField
+	nil,                                                     // 124: bess.pb.MetadataTestArg.ReadEntry
+	nil,                                                     // 125: bess.pb.MetadataTestArg.WriteEntry
+	nil,                                                     // 126: bess.pb.MetadataTestArg.UpdateEntry
+	(*NATArg_PortRange)(nil),                                // 127: bess.pb.NATArg.PortRange
+	(*NATArg_ExternalAddress)(nil),                          // 128: bess.pb.NATArg.ExternalAddress
+	(*StaticNATArg_AddressRange)(nil),                       // 129: bess.pb.StaticNATArg.AddressRange
+	(*StaticNATArg_AddressRangePair)(nil),                   // 130: bess.pb.StaticNATArg.AddressRangePair
+	(*RandomUpdateArg_Field)(nil),                           // 131: bess.pb.RandomUpdateArg.Field
+	(*SetMetadataArg_Attribute)(nil),                        // 132: bess.pb.SetMetadataArg.Attribute
+	(*UpdateArg_Field)(nil),                                 // 133: bess.pb.UpdateArg.Field
+	(*UrlFilterArg_Url)(nil),                                // 134: bess.pb.UrlFilterArg.Url
+	(*WildcardMatchArg_IndexSet)(nil),                       // 135: bess.pb.WildcardMatchArg.IndexSet
+	nil,                                                     // 136: bess.pb.WorkerSplitArg.WorkerGatesEntry
+	(*FlowMeasureReadResponse_Statistic)(nil),               // 137: bess.pb.FlowMeasureReadResponse.Statistic
+	(*FlowMeasureReadResponse_Statistic_Histogram)(nil),     // 138: bess.pb.FlowMeasureReadResponse.Statistic.Histogram
+	(*GtpuPathMonitoringCommandReadResponse_Statistic)(nil), // 139: bess.pb.GtpuPathMonitoringCommandReadResponse.Statistic
+	(*FieldData)(nil),                                       // 140: bess.pb.FieldData
+	(*Field)(nil),                                           // 141: bess.pb.Field
 }
 var file_module_msg_proto_depIdxs = []int32{
-	137, // 0: bess.pb.ExactMatchCommandAddArg.fields:type_name -> bess.pb.FieldData
-	137, // 1: bess.pb.ExactMatchCommandAddArg.values:type_name -> bess.pb.FieldData
-	137, // 2: bess.pb.ExactMatchCommandDeleteArg.fields:type_name -> bess.pb.FieldData
-	138, // 3: bess.pb.HashLBCommandSetModeArg.fields:type_name -> bess.pb.Field
-	116, // 4: bess.pb.L2ForwardCommandAddArg.entries:type_name -> bess.pb.L2ForwardCommandAddArg.Entry
-	117, // 5: bess.pb.MeasureCommandGetSummaryResponse.latency:type_name -> bess.pb.MeasureCommandGetSummaryResponse.Histogram
-	117, // 6: bess.pb.MeasureCommandGetSummaryResponse.jitter:type_name -> bess.pb.MeasureCommandGetSummaryResponse.Histogram
-	137, // 7: bess.pb.WildcardMatchCommandAddArg.values:type_name -> bess.pb.FieldData
-	137, // 8: bess.pb.WildcardMatchCommandAddArg.masks:type_name -> bess.pb.FieldData
-	137, // 9: bess.pb.WildcardMatchCommandAddArg.valuesv:type_name -> bess.pb.FieldData
-	137, // 10: bess.pb.WildcardMatchCommandDeleteArg.values:type_name -> bess.pb.FieldData
-	137, // 11: bess.pb.WildcardMatchCommandDeleteArg.masks:type_name -> bess.pb.FieldData
-	118, // 12: bess.pb.ACLArg.rules:type_name -> bess.pb.ACLArg.Rule
-	119, // 13: bess.pb.BPFArg.filters:type_name -> bess.pb.BPFArg.Filter
-	138, // 14: bess.pb.ExactMatchArg.fields:type_name -> bess.pb.Field
-	137, // 15: bess.pb.ExactMatchArg.masks:type_name -> bess.pb.FieldData
-	138, // 16: bess.pb.ExactMatchArg.values:type_name -> bess.pb.Field
-	137, // 17: bess.pb.ExactMatchArg.masksv:type_name -> bess.pb.FieldData
+	140, // 0: bess.pb.ExactMatchCommandAddArg.fields:type_name -> bess.pb.FieldData
+	140, // 1: bess.pb.ExactMatchCommandAddArg.values:type_name -> bess.pb.FieldData
+	140, // 2: bess.pb.ExactMatchCommandDeleteArg.fields:type_name -> bess.pb.FieldData
+	141, // 3: bess.pb.HashLBCommandSetModeArg.fields:type_name -> bess.pb.Field
+	119, // 4: bess.pb.L2ForwardCommandAddArg.entries:type_name -> bess.pb.L2ForwardCommandAddArg.Entry
+	120, // 5: bess.pb.MeasureCommandGetSummaryResponse.latency:type_name -> bess.pb.MeasureCommandGetSummaryResponse.Histogram
+	120, // 6: bess.pb.MeasureCommandGetSummaryResponse.jitter:type_name -> bess.pb.MeasureCommandGetSummaryResponse.Histogram
+	140, // 7: bess.pb.WildcardMatchCommandAddArg.values:type_name -> bess.pb.FieldData
+	140, // 8: bess.pb.WildcardMatchCommandAddArg.masks:type_name -> bess.pb.FieldData
+	140, // 9: bess.pb.WildcardMatchCommandAddArg.valuesv:type_name -> bess.pb.FieldData
+	140, // 10: bess.pb.WildcardMatchCommandDeleteArg.values:type_name -> bess.pb.FieldData
+	140, // 11: bess.pb.WildcardMatchCommandDeleteArg.masks:type_name -> bess.pb.FieldData
+	121, // 12: bess.pb.ACLArg.rules:type_name -> bess.pb.ACLArg.Rule
+	122, // 13: bess.pb.BPFArg.filters:type_name -> bess.pb.BPFArg.Filter
+	141, // 14: bess.pb.ExactMatchArg.fields:type_name -> bess.pb.Field
+	140, // 15: bess.pb.ExactMatchArg.masks:type_name -> bess.pb.FieldData
+	141, // 16: bess.pb.ExactMatchArg.values:type_name -> bess.pb.Field
+	140, // 17: bess.pb.ExactMatchArg.masksv:type_name -> bess.pb.FieldData
 	2,   // 18: bess.pb.ExactMatchConfig.rules:type_name -> bess.pb.ExactMatchCommandAddArg
-	120, // 19: bess.pb.GenericEncapArg.fields:type_name -> bess.pb.GenericEncapArg.EncapField
-	138, // 20: bess.pb.HashLBArg.fields:type_name -> bess.pb.Field
-	121, // 21: bess.pb.MetadataTestArg.read:type_name -> bess.pb.MetadataTestArg.ReadEntry
-	122, // 22: bess.pb.MetadataTestArg.write:type_name -> bess.pb.MetadataTestArg.WriteEntry
-	123, // 23: bess.pb.MetadataTestArg.update:type_name -> bess.pb.MetadataTestArg.UpdateEntry
-	125, // 24: bess.pb.NATArg.ext_addrs:type_name -> bess.pb.NATArg.ExternalAddress
-	127, // 25: bess.pb.StaticNATArg.pairs:type_name -> bess.pb.StaticNATArg.AddressRangePair
-	128, // 26: bess.pb.RandomUpdateArg.fields:type_name -> bess.pb.RandomUpdateArg.Field
-	129, // 27: bess.pb.SetMetadataArg.attrs:type_name -> bess.pb.SetMetadataArg.Attribute
-	130, // 28: bess.pb.UpdateArg.fields:type_name -> bess.pb.UpdateArg.Field
-	131, // 29: bess.pb.UrlFilterArg.blacklist:type_name -> bess.pb.UrlFilterArg.Url
-	131, // 30: bess.pb.UrlFilterConfig.blacklist:type_name -> bess.pb.UrlFilterArg.Url
-	138, // 31: bess.pb.WildcardMatchArg.fields:type_name -> bess.pb.Field
-	138, // 32: bess.pb.WildcardMatchArg.values:type_name -> bess.pb.Field
-	132, // 33: bess.pb.WildcardMatchArg.index_sets:type_name -> bess.pb.WildcardMatchArg.IndexSet
-	32,  // 34: bess.pb.WildcardMatchConfig.rules:type_name -> bess.pb.WildcardMatchCommandAddArg
-	133, // 35: bess.pb.WorkerSplitArg.worker_gates:type_name -> bess.pb.WorkerSplitArg.WorkerGatesEntry
-	138, // 36: bess.pb.QosArg.fields:type_name -> bess.pb.Field
-	138, // 37: bess.pb.QosArg.values:type_name -> bess.pb.Field
-	137, // 38: bess.pb.QosCommandAddArg.fields:type_name -> bess.pb.FieldData
-	137, // 39: bess.pb.QosCommandAddArg.values:type_name -> bess.pb.FieldData
-	137, // 40: bess.pb.QosCommandDeleteArg.fields:type_name -> bess.pb.FieldData
-	134, // 41: bess.pb.FlowMeasureReadResponse.statistics:type_name -> bess.pb.FlowMeasureReadResponse.Statistic
-	136, // 42: bess.pb.GtpuPathMonitoringCommandReadResponse.statistics:type_name -> bess.pb.GtpuPathMonitoringCommandReadResponse.Statistic
-	137, // 43: bess.pb.GenericEncapArg.EncapField.value:type_name -> bess.pb.FieldData
-	124, // 44: bess.pb.NATArg.ExternalAddress.port_ranges:type_name -> bess.pb.NATArg.PortRange
-	126, // 45: bess.pb.StaticNATArg.AddressRangePair.int_range:type_name -> bess.pb.StaticNATArg.AddressRange
-	126, // 46: bess.pb.StaticNATArg.AddressRangePair.ext_range:type_name -> bess.pb.StaticNATArg.AddressRange
-	135, // 47: bess.pb.FlowMeasureReadResponse.Statistic.latency:type_name -> bess.pb.FlowMeasureReadResponse.Statistic.Histogram
-	135, // 48: bess.pb.FlowMeasureReadResponse.Statistic.jitter:type_name -> bess.pb.FlowMeasureReadResponse.Statistic.Histogram
+	123, // 19: bess.pb.GenericEncapArg.fields:type_name -> bess.pb.GenericEncapArg.EncapField
+	141, // 20: bess.pb.HashLBArg.fields:type_name -> bess.pb.Field
+	124, // 21: bess.pb.MetadataTestArg.read:type_name -> bess.pb.MetadataTestArg.ReadEntry
+	125, // 22: bess.pb.MetadataTestArg.write:type_name -> bess.pb.MetadataTestArg.WriteEntry
+	126, // 23: bess.pb.MetadataTestArg.update:type_name -> bess.pb.MetadataTestArg.UpdateEntry
+	128, // 24: bess.pb.NATArg.ext_addrs:type_name -> bess.pb.NATArg.ExternalAddress
+	130, // 25: bess.pb.StaticNATArg.pairs:type_name -> bess.pb.StaticNATArg.AddressRangePair
+	131, // 26: bess.pb.RandomUpdateArg.fields:type_name -> bess.pb.RandomUpdateArg.Field
+	132, // 27: bess.pb.SetMetadataArg.attrs:type_name -> bess.pb.SetMetadataArg.Attribute
+	133, // 28: bess.pb.UpdateArg.fields:type_name -> bess.pb.UpdateArg.Field
+	134, // 29: bess.pb.UrlFilterArg.blacklist:type_name -> bess.pb.UrlFilterArg.Url
+	134, // 30: bess.pb.UrlFilterConfig.blacklist:type_name -> bess.pb.UrlFilterArg.Url
+	141, // 31: bess.pb.WildcardMatchArg.fields:type_name -> bess.pb.Field
+	141, // 32: bess.pb.WildcardMatchArg.values:type_name -> bess.pb.Field
+	135, // 33: bess.pb.WildcardMatchArg.index_sets:type_name -> bess.pb.WildcardMatchArg.IndexSet
+	34,  // 34: bess.pb.WildcardMatchConfig.rules:type_name -> bess.pb.WildcardMatchCommandAddArg
+	136, // 35: bess.pb.WorkerSplitArg.worker_gates:type_name -> bess.pb.WorkerSplitArg.WorkerGatesEntry
+	141, // 36: bess.pb.QosArg.fields:type_name -> bess.pb.Field
+	141, // 37: bess.pb.QosArg.values:type_name -> bess.pb.Field
+	140, // 38: bess.pb.QosCommandAddArg.fields:type_name -> bess.pb.FieldData
+	140, // 39: bess.pb.QosCommandAddArg.values:type_name -> bess.pb.FieldData
+	140, // 40: bess.pb.QosCommandDeleteArg.fields:type_name -> bess.pb.FieldData
+	137, // 41: bess.pb.FlowMeasureReadResponse.statistics:type_name -> bess.pb.FlowMeasureReadResponse.Statistic
+	139, // 42: bess.pb.GtpuPathMonitoringCommandReadResponse.statistics:type_name -> bess.pb.GtpuPathMonitoringCommandReadResponse.Statistic
+	140, // 43: bess.pb.GenericEncapArg.EncapField.value:type_name -> bess.pb.FieldData
+	127, // 44: bess.pb.NATArg.ExternalAddress.port_ranges:type_name -> bess.pb.NATArg.PortRange
+	129, // 45: bess.pb.StaticNATArg.AddressRangePair.int_range:type_name -> bess.pb.StaticNATArg.AddressRange
+	129, // 46: bess.pb.StaticNATArg.AddressRangePair.ext_range:type_name -> bess.pb.StaticNATArg.AddressRange
+	138, // 47: bess.pb.FlowMeasureReadResponse.Statistic.latency:type_name -> bess.pb.FlowMeasureReadResponse.Statistic.Histogram
+	138, // 48: bess.pb.FlowMeasureReadResponse.Statistic.jitter:type_name -> bess.pb.FlowMeasureReadResponse.Statistic.Histogram
 	49,  // [49:49] is the sub-list for method output_type
 	49,  // [49:49] is the sub-list for method input_type
 	49,  // [49:49] is the sub-list for extension type_name
@@ -8529,37 +8779,37 @@ func file_module_msg_proto_init() {
 		return
 	}
 	file_util_msg_proto_init()
-	file_module_msg_proto_msgTypes[52].OneofWrappers = []any{
+	file_module_msg_proto_msgTypes[55].OneofWrappers = []any{
 		(*MeasureArg_Offset)(nil),
 		(*MeasureArg_AttrName)(nil),
 	}
-	file_module_msg_proto_msgTypes[87].OneofWrappers = []any{
+	file_module_msg_proto_msgTypes[90].OneofWrappers = []any{
 		(*SplitArg_Attribute)(nil),
 		(*SplitArg_Offset)(nil),
 	}
-	file_module_msg_proto_msgTypes[88].OneofWrappers = []any{
+	file_module_msg_proto_msgTypes[91].OneofWrappers = []any{
 		(*TimestampArg_Offset)(nil),
 		(*TimestampArg_AttrName)(nil),
 	}
-	file_module_msg_proto_msgTypes[103].OneofWrappers = []any{
+	file_module_msg_proto_msgTypes[106].OneofWrappers = []any{
 		(*QosCommandAddArg_DeductLen)(nil),
 	}
-	file_module_msg_proto_msgTypes[120].OneofWrappers = []any{
+	file_module_msg_proto_msgTypes[123].OneofWrappers = []any{
 		(*GenericEncapArg_EncapField_Attribute)(nil),
 		(*GenericEncapArg_EncapField_Value)(nil),
 	}
-	file_module_msg_proto_msgTypes[129].OneofWrappers = []any{
+	file_module_msg_proto_msgTypes[132].OneofWrappers = []any{
 		(*SetMetadataArg_Attribute_ValueInt)(nil),
 		(*SetMetadataArg_Attribute_ValueBin)(nil),
 	}
-	file_module_msg_proto_msgTypes[132].OneofWrappers = []any{}
+	file_module_msg_proto_msgTypes[135].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_module_msg_proto_rawDesc), len(file_module_msg_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   137,
+			NumMessages:   140,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
