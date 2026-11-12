@@ -45,10 +45,15 @@ var (
 	endMarkerSrcMAC = [6]byte{0xFF, 0xAA, 0xFA, 0xAA, 0xFF, 0xAA} // Placeholder for local interface MAC
 )
 
-// addEndMarker appends a GTP-U End Marker for the tunnel farItem forwards on. The packet
-// is IPv4, so a tunnel with an IPv6 endpoint gets none.
+// addEndMarker appends a GTP-U End Marker for the tunnel farItem forwards on, in an
+// outer header of the tunnel's family.
 func addEndMarker(farItem far, endMarkerList *[][]byte) {
 	logger.PfcpLog.Infoln("adding end marker for farID:", farItem.farID)
+
+	if farItem.tunnelIPDst.Is6() {
+		addEndMarker6(farItem, endMarkerList)
+		return
+	}
 
 	tunnelSrc, tunnelDst, err := farItem.ipv4Tunnel()
 	if err != nil {
@@ -91,6 +96,85 @@ func addEndMarker(farItem far, endMarkerList *[][]byte) {
 	binary.BigEndian.PutUint32(packet[gtpOffset+4:], farItem.tunnelTEID) // TEID
 
 	*endMarkerList = append(*endMarkerList, packet)
+}
+
+// IPv6 end marker layout: the fixed IPv6 header in place of the IPv4 one.
+const (
+	ipv6HeaderSize = 40
+	endMarker6Size = ethHeaderSize + ipv6HeaderSize + udpHeaderSize + gtpHeaderSize
+	ip6SrcOffset   = ipOffset + 8
+	ip6DstOffset   = ipOffset + 24
+	udp6Offset     = ipOffset + ipv6HeaderSize
+	gtp6Offset     = udp6Offset + udpHeaderSize
+)
+
+// addEndMarker6 appends the End Marker of a tunnel to an IPv6 peer, sent from the
+// address the FAR's tunnel leaves from. Over IPv6 the UDP checksum is not optional
+// (RFC 8200 section 8.1), so it is filled in; the datapath does not recompute it.
+func addEndMarker6(farItem far, endMarkerList *[][]byte) {
+	if !farItem.tunnelIPSrc.Is6() {
+		logger.PfcpLog.Errorln("no end marker for the old tunnel: no IPv6 source for", farItem.tunnelIPDst)
+		return
+	}
+
+	packet := make([]byte, endMarker6Size)
+
+	copy(packet[0:6], endMarkerDstMAC[:])
+	copy(packet[6:12], endMarkerSrcMAC[:])
+	binary.BigEndian.PutUint16(packet[ethTypeOffset:], 0x86DD) // IPv6
+
+	// IPv6 header: version 6, traffic class and flow label 0
+	packet[ipOffset] = 0x60
+	binary.BigEndian.PutUint16(packet[ipOffset+4:], udpHeaderSize+gtpHeaderSize) // Payload length
+	packet[ipOffset+6] = 17                                                      // Next header: UDP
+	packet[ipOffset+7] = 64                                                      // Hop limit
+	src, dst := farItem.tunnelIPSrc.As16(), farItem.tunnelIPDst.As16()
+	copy(packet[ip6SrcOffset:], src[:])
+	copy(packet[ip6DstOffset:], dst[:])
+
+	binary.BigEndian.PutUint16(packet[udp6Offset:], tunnelGTPUPort)
+	binary.BigEndian.PutUint16(packet[udp6Offset+2:], tunnelGTPUPort)
+	binary.BigEndian.PutUint16(packet[udp6Offset+4:], udpHeaderSize+gtpHeaderSize)
+
+	packet[gtp6Offset] = 0x30
+	packet[gtp6Offset+1] = gtpEndMarkerType
+	binary.BigEndian.PutUint32(packet[gtp6Offset+4:], farItem.tunnelTEID)
+
+	binary.BigEndian.PutUint16(packet[udp6Offset+6:],
+		udp6Checksum(src, dst, packet[udp6Offset:]))
+
+	*endMarkerList = append(*endMarkerList, packet)
+}
+
+// udp6Checksum is the UDP checksum of datagram (its checksum field 0) between src and
+// dst over IPv6 (RFC 8200 section 8.1); a sum of 0 is sent as 0xffff (RFC 768).
+func udp6Checksum(src, dst [16]byte, datagram []byte) uint16 {
+	var sum uint32
+
+	add := func(b []byte) {
+		for i := 0; i+1 < len(b); i += 2 {
+			sum += uint32(binary.BigEndian.Uint16(b[i:]))
+		}
+
+		if len(b)%2 == 1 {
+			sum += uint32(b[len(b)-1]) << 8
+		}
+	}
+
+	add(src[:])
+	add(dst[:])
+	sum += uint32(len(datagram)) + 17
+	add(datagram)
+
+	for sum>>16 != 0 {
+		sum = (sum >> 16) + (sum & 0xffff)
+	}
+
+	if c := ^uint16(sum); c != 0 {
+		return c
+	}
+
+	return 0xffff
 }
 
 // calculateIPv4Checksum calculates Internet Checksum for IPv4 header (RFC 1071).

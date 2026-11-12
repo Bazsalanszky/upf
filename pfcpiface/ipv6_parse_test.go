@@ -185,9 +185,9 @@ func TestParseFTEID(t *testing.T) {
 			wantChoose: true,
 		},
 		{
-			name:    "CHOOSE IPv6 only",
-			ie:      ie.NewFTEID(0x06, 0, nil, nil, 0),
-			wantErr: true,
+			name:       "CHOOSE IPv6 only",
+			ie:         ie.NewFTEID(0x06, 0, nil, nil, 0),
+			wantChoose: true,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -248,14 +248,16 @@ func TestPDRDatapathSupport(t *testing.T) {
 			name: "IPv4v6 F-TEID",
 			ie:   uplink(ie.NewFTEID(0x03, 0x100, net.ParseIP("10.10.3.1"), net.ParseIP("2001:db8::1"), 0)),
 		},
-		{name: "IPv6 F-TEID", ie: uplink(ie.NewFTEID(0x02, 0x100, nil, net.ParseIP("2001:db8::1"), 0)), wantErr: true},
+		// Matched by the low 32 bits of the address (see pdr.tunnelMatches).
+		{name: "IPv6 F-TEID", ie: uplink(ie.NewFTEID(0x02, 0x100, nil, net.ParseIP("2001:db8::1"), 0))},
 		{name: "OHR GTP-U/UDP/IPv4", ie: withOHR(0), wantNeedDecap: 1},
-		{name: "OHR GTP-U/UDP/IPv6", ie: withOHR(1), wantErr: true},
+		{name: "OHR GTP-U/UDP/IPv6", ie: withOHR(1), wantNeedDecap: 1},
 		{name: "OHR UDP/IPv4", ie: withOHR(2)},
 		{name: "OHR UDP/IPv6", ie: withOHR(3), wantErr: true},
 		{name: "OHR IPv6", ie: withOHR(5), wantErr: true},
-		// GTP-U/UDP/IP: either family. It has never set needDecap, and still does not.
-		{name: "OHR GTP-U/UDP/IP", ie: withOHR(6)},
+		// GTP-U/UDP/IP: either family. It used not to set needDecap, which left the
+		// GTP-U header on uplink packets.
+		{name: "OHR GTP-U/UDP/IP", ie: withOHR(6), wantNeedDecap: 1},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var p pdr
@@ -391,19 +393,13 @@ func TestADualStackSessionProgramsTheIPv4Rules(t *testing.T) {
 	}
 }
 
-// A rule the datapath cannot install is refused before any of the session reaches it.
+// A rule the datapath cannot install is refused before any of the session reaches it:
+// here, a tunnel to an IPv6 peer from a UPF with no IPv6 address to send it from.
 func TestAnIPv6RuleIsRejectedBeforeTheDatapath(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		rule *ie.IE
 	}{
-		{
-			name: "IPv6 F-TEID",
-			rule: goldenPDR(1, 255, 1, []*ie.IE{
-				ie.NewSourceInterface(ie.SrcInterfaceAccess),
-				ie.NewFTEID(0x02, 0x100, nil, net.ParseIP("2001:db8::1"), 0),
-			}),
-		},
 		{
 			name: "IPv6 outer header",
 			rule: ie.NewCreateFAR(

@@ -120,14 +120,28 @@ func (pConn *PFCPConn) associationIEs() []*ie.IE {
 		setEndMarkerFeature(features...)
 	}
 
+	// The N3 addresses, of each family the UPF offers (see upf.n3Addrs); they do not
+	// depend on the N4 address family. The flags' low bits say which are present:
+	// 0x41 = Spare (0) | Assoc Src Inst (1) | Assoc Net Inst (0) | Tied Range (000) | IPV6 (0) | IPV4 (1)
+	// TS 29.244 clause 8.2.82.
+	n3v4, n3v6 := upf.n3Addrs()
+	flags &^= 0x03
+
+	var v4, v6 string
+	if n3v4.IsValid() {
+		flags |= 0x01
+		v4 = n3v4.String()
+	}
+
+	if n3v6.IsValid() {
+		flags |= 0x02
+		v6 = n3v6.String()
+	}
+
 	ies := []*ie.IE{
 		ie.NewRecoveryTimeStamp(pConn.ts.local),
 		pConn.nodeID.localIE,
-		// 0x41 = Spare (0) | Assoc Src Inst (1) | Assoc Net Inst (0) | Tied Range (000) | IPV6 (0) | IPV4 (1)
-		//      = 01000001
-		// TODO(ipv6-p2): this is the N3 address, IPv4 only. Advertise the IPv6 one (V6) once
-		// the datapath has an IPv6 N3; it does not depend on the N4 address family.
-		ie.NewUserPlaneIPResourceInformation(flags, 0, upf.accessIP.String(), "", networkInstance, ie.SrcInterfaceAccess),
+		ie.NewUserPlaneIPResourceInformation(flags, 0, v4, v6, networkInstance, ie.SrcInterfaceAccess),
 		// ie.NewUserPlaneIPResourceInformation(0x41, 0, coreIP, "", "", ie.SrcInterfaceCore),
 		ie.NewUPFunctionFeatures(features...),
 	}
