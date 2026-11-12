@@ -270,6 +270,67 @@ TEST(ChecksumTest, UdpChecksum) {
   }
 }
 
+// UDP and TCP over IPv6 against DPDK's rte_ipv6_udptcp_cksum
+TEST(ChecksumTest, Ipv6UdpTcpChecksum) {
+  alignas(8) char buf[1514] = {0};  // ipv6 header + l4 header + payload
+
+  bess::utils::Ipv6 *ip = reinterpret_cast<bess::utils::Ipv6 *>(buf);
+  bess::utils::Udp *udp = reinterpret_cast<bess::utils::Udp *>(ip + 1);
+  bess::utils::Tcp *tcp = reinterpret_cast<bess::utils::Tcp *>(ip + 1);
+  char *l4 = reinterpret_cast<char *>(ip + 1);
+
+  for (int i = 0; i < 10000; i++) {
+    // Odd and even lengths, so the last byte's padding is exercised.
+    uint32_t payload = rd.Get() % 1400;
+    for (size_t j = 0; j < 16; j += 4) {
+      uint32_t s = rd.Get(), d = rd.Get();
+      memcpy(ip->src + j, &s, 4);
+      memcpy(ip->dst + j, &d, 4);
+    }
+    for (uint32_t j = 0; j < payload + 20; j++) {
+      l4[j] = static_cast<char>(rd.Get());
+    }
+    ip->set_version_traffic_class(0);
+    ip->hop_limit = 64;
+
+    // UDP
+    uint32_t udp_len = sizeof(*udp) + payload;
+    ip->next_header = bess::utils::Ipv4::Proto::kUdp;
+    ip->payload_length = be16_t(udp_len);
+    udp->length = be16_t(udp_len);
+    udp->checksum = 0;
+    uint16_t cksum_dpdk =
+        rte_ipv6_udptcp_cksum(reinterpret_cast<const rte_ipv6_hdr *>(ip), udp);
+    // The field's value is left out of the sum.
+    udp->checksum = static_cast<uint16_t>(rd.Get());
+    uint16_t cksum_bess = CalculateIpv6UdpChecksum(*ip, *udp, udp_len);
+    EXPECT_EQ(cksum_dpdk, cksum_bess);
+    EXPECT_NE(0, cksum_bess);
+    udp->checksum = cksum_bess;
+    EXPECT_TRUE(VerifyIpv6UdpChecksum(*ip, *udp, udp_len));
+    udp->checksum ^= 0x0100;
+    EXPECT_FALSE(VerifyIpv6UdpChecksum(*ip, *udp, udp_len));
+    // A zero UDP checksum is accepted (RFC 6935/6936 tunnels).
+    udp->checksum = 0;
+    EXPECT_TRUE(VerifyIpv6UdpChecksum(*ip, *udp, udp_len));
+
+    // TCP
+    uint32_t tcp_len = sizeof(*tcp) + payload;
+    ip->next_header = bess::utils::Ipv4::Proto::kTcp;
+    ip->payload_length = be16_t(tcp_len);
+    tcp->checksum = 0;
+    cksum_dpdk =
+        rte_ipv6_udptcp_cksum(reinterpret_cast<const rte_ipv6_hdr *>(ip), tcp);
+    tcp->checksum = static_cast<uint16_t>(rd.Get());
+    cksum_bess = CalculateIpv6TcpChecksum(*ip, *tcp, tcp_len);
+    EXPECT_EQ(cksum_dpdk, cksum_bess);
+    tcp->checksum = cksum_bess;
+    EXPECT_TRUE(VerifyIpv6TcpChecksum(*ip, *tcp, tcp_len));
+    tcp->checksum ^= 0x0001;
+    EXPECT_FALSE(VerifyIpv6TcpChecksum(*ip, *tcp, tcp_len));
+  }
+}
+
 // Tests TCP checksum
 TEST(ChecksumTest, TcpChecksum) {
   char buf[1514] = {0};  // ipv4 header + tcp header + payload

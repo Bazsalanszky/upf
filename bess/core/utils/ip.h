@@ -91,6 +91,35 @@ struct [[gnu::packed]] Ipv4 {
 static_assert(std::is_pod<Ipv4>::value, "not a POD type");
 static_assert(sizeof(Ipv4) == 20, "struct Ipv4 is incorrect");
 
+// The fixed IPv6 header (RFC 8200 section 3). Extension headers, if any,
+// follow it; next_header then names the first of them.
+struct [[gnu::packed]] Ipv6 {
+  // Version (4 bits), Traffic Class (8 bits) and Flow Label (20 bits).
+  be32_t vtc_flow;
+  be16_t payload_length;  // Length of everything after this header.
+  uint8_t next_header;    // Same values as Ipv4::Proto.
+  uint8_t hop_limit;
+  uint8_t src[16];
+  uint8_t dst[16];
+
+  uint8_t version() const { return vtc_flow.value() >> 28; }
+  uint8_t traffic_class() const { return (vtc_flow.value() >> 20) & 0xFF; }
+  // Version 6, the given Traffic Class and Flow Label 0.
+  void set_version_traffic_class(uint8_t tc) {
+    vtc_flow = be32_t((6u << 28) | (static_cast<uint32_t>(tc) << 20));
+  }
+};
+
+static_assert(std::is_pod<Ipv6>::value, "not a POD type");
+static_assert(sizeof(Ipv6) == 40, "struct Ipv6 is incorrect");
+
+// return false if string -> 16 network-order bytes conversion failed
+// (*addr is unmodified)
+bool ParseIpv6Address(const std::string &str, uint8_t addr[16]);
+
+// 16 network-order bytes -> string
+std::string ToIpv6Address(const uint8_t addr[16]);
+
 struct Ipv4Prefix {
   // Implicit default constructor is not allowed
   Ipv4Prefix() = delete;

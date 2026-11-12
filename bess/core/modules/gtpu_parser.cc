@@ -18,6 +18,7 @@
 using bess::utils::Ethernet;
 using bess::utils::Gtpv1;
 using bess::utils::Ipv4;
+using bess::utils::Ipv6;
 using bess::utils::Tcp;
 using bess::utils::Udp;
 
@@ -66,7 +67,8 @@ void GtpuParser::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
  * against the bytes the first segment holds before it is made. A packet that
  * claims more than it holds is reported through `malformed`; one that is
  * simply not an IPv4 G-PDU, such as an Error Indication or an IPv6 payload, is
- * dropped without being reported. */
+ * dropped without being reported. The G-PDU may come in an IPv4 or an IPv6
+ * outer header (see ParseIpv6()). */
 gate_idx_t GtpuParser::Parse(bess::Packet *p, const char **malformed) {
   static const uint32_t _const_val = 0xFFFFFFFFu;
   const size_t len = p->head_len();
@@ -84,6 +86,9 @@ gate_idx_t GtpuParser::Parse(bess::Packet *p, const char **malformed) {
      * session's uplink rule, which sent it to decapsulation. */
     set_unmatchable_attrs(p);
     return FORWARD_GATE;
+  }
+  if (eth->ether_type == (be16_t)(Ethernet::kIpv6)) {
+    return ParseIpv6(p, malformed);
   }
   if (eth->ether_type != (be16_t)(Ethernet::kIpv4)) {
     return DEFAULT_GATE;
@@ -130,7 +135,7 @@ gate_idx_t GtpuParser::Parse(bess::Packet *p, const char **malformed) {
       }
       Udp *udph = reinterpret_cast<Udp *>(head + l4_off);
       if (udph->dst_port == (be16_t)(UDP_PORT_GTPU)) {
-        return ParseGtpu(p, iph, l4_off + sizeof(Udp), malformed);
+        return ParseGtpu(p, iph->dst, l4_off + sizeof(Udp), malformed);
       }
       set_gtp_parsing_attrs(&iph->src, &iph->dst, &udph->src_port,
                             &udph->dst_port, (be32_t *)&_const_val,
@@ -171,8 +176,46 @@ void GtpuParser::set_unmatchable_attrs(bess::Packet *p) {
                         &reserved_proto, p);
 }
 /*----------------------------------------------------------------------------------*/
-/* The GTP-U part of Parse(), from the GTP-U header at `gtp_off`. */
-gate_idx_t GtpuParser::ParseGtpu(bess::Packet *p, Ipv4 *outer_iph,
+/* An IPv6 packet: a G-PDU in an IPv6 outer header (N3/N9 over IPv6) is
+ * classified on its inner IPv4 packet, as one in an IPv4 outer header is. The
+ * UDP header must follow the fixed header: an outer header with extension
+ * headers is not classified. Any other IPv6 packet -- neighbour discovery,
+ * IPv6 UE traffic on the core side -- is not classified either, and is not
+ * reported.
+ *
+ * pdrLookup matches the tunnel destination in the 4-byte tunnel_ipv4_dst. For
+ * an IPv6 outer header that is the low-order 32 bits of the destination
+ * address: the access filters let in only packets for the UPF's own N3
+ * addresses, so the field only has to tell those apart, and pfcpiface writes
+ * an IPv6 F-TEID the same way. */
+gate_idx_t GtpuParser::ParseIpv6(bess::Packet *p, const char **malformed) {
+  const size_t len = p->head_len();
+  char *head = p->head_data<char *>();
+
+  const size_t ip_off = sizeof(Ethernet);
+  if (len < ip_off + sizeof(Ipv6)) {
+    *malformed = "outer IPv6 header";
+    return DEFAULT_GATE;
+  }
+  Ipv6 *ip6h = reinterpret_cast<Ipv6 *>(head + ip_off);
+  if (ip6h->version() != 6 || ip6h->next_header != Ipv4::kUdp) {
+    return DEFAULT_GATE;
+  }
+  const size_t l4_off = ip_off + sizeof(Ipv6);
+  if (l4_off + sizeof(Udp) > len) {
+    *malformed = "UDP header";
+    return DEFAULT_GATE;
+  }
+  Udp *udph = reinterpret_cast<Udp *>(head + l4_off);
+  if (udph->dst_port != (be16_t)(UDP_PORT_GTPU)) {
+    return DEFAULT_GATE;
+  }
+  return ParseGtpu(p, Ipv6TunnelKey(*ip6h), l4_off + sizeof(Udp), malformed);
+}
+/*----------------------------------------------------------------------------------*/
+/* The GTP-U part of Parse(), from the GTP-U header at `gtp_off`, for a tunnel
+ * whose destination pdrLookup knows as `tunnel_dst` (see ParseIpv6()). */
+gate_idx_t GtpuParser::ParseGtpu(bess::Packet *p, be32_t tunnel_dst,
                                  size_t gtp_off, const char **malformed) {
   static const uint32_t _const_val = 0xFFFFFFFFu;
   const size_t len = p->head_len();
@@ -229,15 +272,15 @@ gate_idx_t GtpuParser::ParseGtpu(bess::Packet *p, Ipv4 *outer_iph,
       /* TCP and UDP both start with the source and destination ports. */
       Udp *ports = reinterpret_cast<Udp *>(head + l4_off);
       set_gtp_parsing_attrs(&iph->src, &iph->dst, &ports->src_port,
-                            &ports->dst_port, (be32_t *)&teid, &outer_iph->dst,
+                            &ports->dst_port, (be32_t *)&teid, &tunnel_dst,
                             &iph->protocol, p);
       break;
     }
     default:
       /* ESP, later fragments and the rest: no ports to classify on. */
       set_gtp_parsing_attrs(&iph->src, &iph->dst, (be16_t *)&_const_val,
-                            (be16_t *)&_const_val, (be32_t *)&teid,
-                            &outer_iph->dst, &iph->protocol, p);
+                            (be16_t *)&_const_val, (be32_t *)&teid, &tunnel_dst,
+                            &iph->protocol, p);
       break;
   }
 

@@ -52,7 +52,12 @@ void L4Checksum::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
   for (int i = 0; i < cnt; i++) {
     Ethernet *eth = batch->pkts()[i]->head_data<Ethernet *>();
 
-    // Calculate checksum only for IPv4 packets
+    if (eth->ether_type == be16_t(Ethernet::Type::kIpv6)) {
+      EmitPacket(ctx, batch->pkts()[i], ProcessIpv6(batch->pkts()[i]));
+      continue;
+    }
+
+    // Calculate checksum only for IPv4 and IPv6 packets
     if (eth->ether_type != be16_t(Ethernet::Type::kIpv4)) {
       EmitPacket(ctx, batch->pkts()[i], FORWARD_GATE);
       continue;
@@ -108,6 +113,57 @@ void L4Checksum::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
   }
 }
 
+// UDP or TCP directly behind the fixed IPv6 header (no extension headers),
+// whole in the first segment; anything else is forwarded as it is. Returns the
+// gate: FAIL_GATE for a checksum that does not verify.
+gate_idx_t L4Checksum::ProcessIpv6(bess::Packet *p) {
+  using bess::utils::Ethernet;
+  using bess::utils::Ipv4;
+  using bess::utils::Ipv6;
+  using bess::utils::Tcp;
+  using bess::utils::Udp;
+
+  const size_t l4_off = sizeof(Ethernet) + sizeof(Ipv6);
+  if (static_cast<size_t>(p->head_len()) < l4_off) {
+    return FORWARD_GATE;
+  }
+  Ipv6 *ip6 =
+      reinterpret_cast<Ipv6 *>(p->head_data<uint8_t *>() + sizeof(Ethernet));
+  const uint32_t l4_len = ip6->payload_length.value();
+  if (static_cast<size_t>(p->head_len()) < l4_off + l4_len) {
+    return FORWARD_GATE;
+  }
+  void *l4 = ip6 + 1;
+  const bool udp = ip6->next_header == Ipv4::Proto::kUdp;
+  const bool tcp = ip6->next_header == Ipv4::Proto::kTcp;
+  if ((!udp || l4_len < sizeof(Udp)) && (!tcp || l4_len < sizeof(Tcp))) {
+    return FORWARD_GATE;
+  }
+
+  if (verify_) {
+    if (hw_) {
+      struct rte_mbuf *m = reinterpret_cast<struct rte_mbuf *>(p);
+      return (m->ol_flags & RTE_MBUF_F_RX_L4_CKSUM_MASK) ==
+                     RTE_MBUF_F_RX_L4_CKSUM_BAD
+                 ? FAIL_GATE
+                 : FORWARD_GATE;
+    }
+    bool ok =
+        udp ? VerifyIpv6UdpChecksum(*ip6, *static_cast<Udp *>(l4), l4_len)
+            : VerifyIpv6TcpChecksum(*ip6, *static_cast<Tcp *>(l4), l4_len);
+    return ok ? FORWARD_GATE : FAIL_GATE;
+  }
+
+  if (udp) {
+    Udp *udph = static_cast<Udp *>(l4);
+    udph->checksum = CalculateIpv6UdpChecksum(*ip6, *udph, l4_len);
+  } else {
+    Tcp *tcph = static_cast<Tcp *>(l4);
+    tcph->checksum = CalculateIpv6TcpChecksum(*ip6, *tcph, l4_len);
+  }
+  return FORWARD_GATE;
+}
+
 CommandResponse L4Checksum::Init(const bess::pb::L4ChecksumArg &arg) {
   verify_ = arg.verify();
   hw_ = arg.hw();
@@ -115,4 +171,4 @@ CommandResponse L4Checksum::Init(const bess::pb::L4ChecksumArg &arg) {
 }
 
 ADD_MODULE(L4Checksum, "l4_checksum",
-           "recomputes the TCP/Ipv4 and UDP/IPv4 checksum")
+           "recomputes the TCP and UDP checksum over IPv4 and IPv6")

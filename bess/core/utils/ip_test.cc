@@ -31,6 +31,7 @@
 
 #include "ip.h"
 
+#include <cstring>
 #include <gtest/gtest.h>
 
 using bess::utils::be32_t;
@@ -53,6 +54,34 @@ TEST(IPTest, AddressInStr) {
   EXPECT_FALSE(ParseIpv4Address("hello", &b));
   EXPECT_FALSE(ParseIpv4Address("1.1.1", &b));
   EXPECT_FALSE(ParseIpv4Address("1.1.256.1", &b));
+}
+
+TEST(IPTest, Ipv6AddressInStr) {
+  uint8_t a[16];
+  ASSERT_TRUE(bess::utils::ParseIpv6Address("2001:db8::1", a));
+  const uint8_t want[16] = {0x20, 0x01, 0x0d, 0xb8, 0, 0, 0, 0,
+                            0,    0,    0,    0,    0, 0, 0, 1};
+  EXPECT_EQ(0, memcmp(a, want, 16));
+  EXPECT_EQ("2001:db8::1", bess::utils::ToIpv6Address(a));
+
+  uint8_t untouched[16] = {0xAA};
+  EXPECT_FALSE(bess::utils::ParseIpv6Address("10.0.0.1", untouched));
+  EXPECT_FALSE(bess::utils::ParseIpv6Address("2001:db8::/64", untouched));
+  EXPECT_FALSE(bess::utils::ParseIpv6Address("", untouched));
+  EXPECT_EQ(0xAA, untouched[0]);
+}
+
+TEST(IPTest, Ipv6Header) {
+  bess::utils::Ipv6 h;
+  memset(&h, 0, sizeof(h));
+  h.set_version_traffic_class(0xB8);
+  EXPECT_EQ(6, h.version());
+  EXPECT_EQ(0xB8, h.traffic_class());
+  const uint8_t *raw = reinterpret_cast<const uint8_t *>(&h);
+  EXPECT_EQ(0x6B, raw[0]);
+  EXPECT_EQ(0x80, raw[1]);
+  EXPECT_EQ(0, raw[2]);
+  EXPECT_EQ(0, raw[3]);
 }
 
 // Check if Ipv4Prefix can be correctly constructed from strings

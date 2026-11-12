@@ -18,6 +18,7 @@ class GtpuDecap final : public Module {
 
  private:
   size_t OuterHeaderLength(bess::Packet *p, const char **malformed);
+  void SetInnerEtherType(bess::Packet *p);
   GtpuDropLog drop_log_;
 };
 /*----------------------------------------------------------------------------------*/
