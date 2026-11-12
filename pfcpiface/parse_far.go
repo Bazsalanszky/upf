@@ -5,6 +5,7 @@ package pfcpiface
 
 import (
 	"fmt"
+	"net/netip"
 
 	"github.com/omec-project/upf-epc/logger"
 	"github.com/wmnsk/go-pfcp/ie"
@@ -33,23 +34,26 @@ const (
 type far struct {
 	farID   uint32
 	fseID   uint64
-	fseidIP uint32
+	fseidIP netip.Addr
 
 	dstIntf       uint8
 	sendEndMarker bool
 	applyAction   uint8
 	tunnelType    uint8
-	tunnelIP4Src  uint32
-	tunnelIP4Dst  uint32
-	tunnelTEID    uint32
-	tunnelPort    uint16
+	tunnelIPSrc   netip.Addr
+	// tunnelIPDst is the peer the FAR's Outer Header Creation sends to. When the IE
+	// carries both an IPv4 and an IPv6 address the UP function picks one (TS 29.244 clause
+	// 8.2.56); this one picks IPv4, the family the datapath forwards.
+	tunnelIPDst netip.Addr
+	tunnelTEID  uint32
+	tunnelPort  uint16
 }
 
 func (f far) String() string {
-	return fmt.Sprintf("FAR(id=%v, F-SEID=%v, F-SEID IPv4=%v, dstInterface=%v, tunnelType=%v, "+
-		"tunnelIPv4Src=%v, tunnelIPv4Dst=%v, tunnelTEID=%v, tunnelSrcPort=%v, "+
-		"sendEndMarker=%v, drops=%v, forwards=%v, buffers=%v)", f.farID, f.fseID, int2ip(f.fseidIP), f.dstIntf,
-		f.tunnelType, int2ip(f.tunnelIP4Src), int2ip(f.tunnelIP4Dst), f.tunnelTEID, f.tunnelPort, f.sendEndMarker,
+	return fmt.Sprintf("FAR(id=%v, F-SEID=%v, F-SEID IP=%v, dstInterface=%v, tunnelType=%v, "+
+		"tunnelIPSrc=%v, tunnelIPDst=%v, tunnelTEID=%v, tunnelSrcPort=%v, "+
+		"sendEndMarker=%v, drops=%v, forwards=%v, buffers=%v)", f.farID, f.fseID, f.fseidIP, f.dstIntf,
+		f.tunnelType, f.tunnelIPSrc, f.tunnelIPDst, f.tunnelTEID, f.tunnelPort, f.sendEndMarker,
 		f.Drops(), f.Forwards(), f.Buffers())
 }
 
@@ -90,7 +94,11 @@ func (f *far) parseFAR(farIE *ie.IE, fseid uint64, upf *upf, op operation) error
 			}
 
 			f.tunnelTEID = ohcFields.TEID
-			f.tunnelIP4Dst = ip2int(ohcFields.IPv4Address)
+			f.tunnelIPDst = addrFromIP(ohcFields.IPv4Address)
+			if !f.tunnelIPDst.IsValid() {
+				f.tunnelIPDst = addrFromIP(ohcFields.IPv6Address)
+			}
+
 			f.tunnelType = uint8(1) // Preserve the existing tunnel type encoding for GTP-U forwarding.
 			f.tunnelPort = tunnelGTPUPort
 		case ie.DestinationInterface:
@@ -104,9 +112,9 @@ func (f *far) parseFAR(farIE *ie.IE, fseid uint64, upf *upf, op operation) error
 
 			switch f.dstIntf {
 			case ie.DstInterfaceAccess:
-				f.tunnelIP4Src = ip2int(upf.accessIP)
+				f.tunnelIPSrc = addrFromIP(upf.accessIP)
 			case ie.DstInterfaceCore:
-				f.tunnelIP4Src = ip2int(upf.coreIP)
+				f.tunnelIPSrc = addrFromIP(upf.coreIP)
 			}
 		case ie.PFCPSMReqFlags:
 			fields = Set(fields, FwdIEPfcpSMReqFlags)
@@ -121,6 +129,16 @@ func (f *far) parseFAR(farIE *ie.IE, fseid uint64, upf *upf, op operation) error
 				f.sendEndMarker = true
 			}
 		}
+	}
+
+	return f.checkDatapathSupport()
+}
+
+// checkDatapathSupport refuses a FAR whose tunnel the datapath cannot build: it
+// encapsulates in IPv4 only. See pdr.checkDatapathSupport for why here.
+func (f far) checkDatapathSupport() error {
+	if f.tunnelIPDst.IsValid() && !f.tunnelIPDst.Is4() {
+		return ErrUnsupported("FAR creating an IPv6 outer header to", f.tunnelIPDst)
 	}
 
 	return nil

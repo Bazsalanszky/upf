@@ -5,7 +5,6 @@
 package pfcpiface
 
 import (
-	"encoding/binary"
 	"net"
 	"strconv"
 	"strings"
@@ -56,12 +55,20 @@ func has2ndBit(f uint8) bool {
 	return f&0x02 != 0
 }
 
+func has4thBit(f uint8) bool {
+	return f&0x08 != 0
+}
+
 func has5thBit(f uint8) bool {
 	return f&0x10 != 0
 }
 
 func has6thBit(f uint8) bool {
 	return f&0x20 != 0
+}
+
+func has7thBit(f uint8) bool {
+	return f&0x40 != 0
 }
 
 func inc(ip net.IP) {
@@ -71,25 +78,6 @@ func inc(ip net.IP) {
 			break
 		}
 	}
-}
-
-func ip2int(ip net.IP) uint32 {
-	// Guard against IP with insufficient length (need at least 4 bytes for uint32)
-	if len(ip) < 4 {
-		return 0
-	}
-	if len(ip) == 16 {
-		return binary.BigEndian.Uint32(ip[12:16])
-	}
-	return binary.BigEndian.Uint32(ip)
-}
-
-func ipMask2int(ip net.IPMask) uint32 {
-	if len(ip) == 16 {
-		return binary.BigEndian.Uint32(ip[12:16])
-	}
-
-	return binary.BigEndian.Uint32(ip)
 }
 
 func hex2int(hexStr string) uint32 {
@@ -103,13 +91,6 @@ func hex2int(hexStr string) uint32 {
 	}
 
 	return uint32(result)
-}
-
-func int2ip(nn uint32) net.IP {
-	ip := make(net.IP, 4)
-	binary.BigEndian.PutUint32(ip, nn)
-
-	return ip
 }
 
 func maxUint64(x, y uint64) uint64 {

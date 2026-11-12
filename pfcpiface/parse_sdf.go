@@ -7,7 +7,7 @@ package pfcpiface
 import (
 	"errors"
 	"fmt"
-	"net"
+	"net/netip"
 	"strconv"
 	"strings"
 
@@ -15,8 +15,7 @@ import (
 )
 
 const (
-	reservedProto         = uint8(0xff)
-	Ipv4WildcardNetString = "0.0.0.0/0"
+	reservedProto = uint8(0xff)
 
 	filterActionPermit = "permit"
 	filterActionDeny   = "deny"
@@ -26,30 +25,74 @@ const (
 
 var errBadFilterDesc = errors.New("unsupported Filter Description format")
 
+// endpoint is one side of a flow description (TS 29.212 clause 5.4.2, IPFilterRule of
+// RFC 6733): "any", "assigned", or an address or prefix of either family.
 type endpoint struct {
-	IPNet *net.IPNet
-	ports portRange
+	// prefix is the address or prefix the flow names, its host bits cleared; a bare
+	// address is a /32 or a /128. The zero Prefix is "any" (or "assigned"): any address
+	// of whichever family the rule is applied to.
+	prefix netip.Prefix
+	// assigned is "assigned": the UE's address of the family the rule is applied to.
+	assigned bool
+	ports    portRange
 }
 
 func (ep *endpoint) parseNet(ipnet string) error {
-	ipNetFields := strings.Split(ipnet, "/")
-
-	switch len(ipNetFields) {
-	case 1:
-		ipnet = ipNetFields[0] + "/32"
-	case 2:
-	default:
-		return ErrInvalidArgument("network string", len(ipNetFields))
+	switch ipnet {
+	case "any":
+		return nil
+	case "assigned":
+		ep.assigned = true
+		return nil
 	}
 
-	var err error
+	if strings.Contains(ipnet, "/") {
+		p, err := netip.ParsePrefix(ipnet)
+		if err != nil {
+			return ErrOperationFailedWithReason("ParsePrefix", err.Error())
+		}
 
-	_, ep.IPNet, err = net.ParseCIDR(ipnet)
+		ep.prefix = p.Masked()
+
+		return nil
+	}
+
+	a, err := netip.ParseAddr(ipnet)
 	if err != nil {
-		return ErrOperationFailedWithReason("ParseCIDR", err.Error())
+		return ErrOperationFailedWithReason("ParseAddr", err.Error())
 	}
+
+	if a.Zone() != "" {
+		return ErrInvalidArgumentWithReason("network string", ipnet, "a scoped address")
+	}
+
+	ep.prefix = hostPrefix(a)
 
 	return nil
+}
+
+// family is the address family the endpoint names: 4, 6, or 0 for "any" and "assigned".
+func (ep endpoint) family() int {
+	switch {
+	case !ep.prefix.IsValid():
+		return 0
+	case ep.prefix.Addr().Is4():
+		return 4
+	default:
+		return 6
+	}
+}
+
+// matchFor returns what the endpoint matches when the rule is applied to traffic of one
+// family: "any" is any address; "assigned" is ue, the UE's address or prefix of that
+// family, or any address when the UE has none -- as it was before the families were
+// told apart; an address or prefix is itself.
+func (ep endpoint) matchFor(ue netip.Prefix) netip.Prefix {
+	if ep.assigned {
+		return matchPrefix(ue)
+	}
+
+	return matchPrefix(ep.prefix)
 }
 
 func (ep *endpoint) parsePort(port string) error {
@@ -97,11 +140,31 @@ func newIpFilterRule() *ipFilterRule {
 func (ipf *ipFilterRule) String() string {
 	return fmt.Sprintf("FlowDescription{action=%v, direction=%v, proto=%v, "+
 		"srcIP=%v, srcPort=%v, dstIP=%v, dstPort=%v}",
-		ipf.action, ipf.direction, ipf.proto, ipf.src.IPNet, ipf.src.ports, ipf.dst.IPNet, ipf.dst.ports)
+		ipf.action, ipf.direction, ipf.proto, ipf.src, ipf.src.ports, ipf.dst, ipf.dst.ports)
 }
 
-func parseFlowDesc(flowDesc, ueIP string) (*ipFilterRule, error) {
-	parseLog := logger.PfcpLog.With("flow-description", flowDesc, "ue-address", ueIP)
+func (ep endpoint) String() string {
+	switch {
+	case ep.assigned:
+		return "assigned"
+	case !ep.prefix.IsValid():
+		return "any"
+	default:
+		return ep.prefix.String()
+	}
+}
+
+// family is the address family the rule's addresses name: 4 or 6, or 0 when it names
+// none ("any" and "assigned" only), and then applies to both.
+func (ipf *ipFilterRule) family() int {
+	return max(ipf.src.family(), ipf.dst.family())
+}
+
+// parseFlowDesc parses a flow description. "any" and "assigned" are kept as such: which
+// address they stand for depends on the family the rule is applied to, and a rule that
+// names no address applies to both.
+func parseFlowDesc(flowDesc string) (*ipFilterRule, error) {
+	parseLog := logger.PfcpLog.With("flow-description", flowDesc)
 	parseLog.Debugln("parsing flow description")
 
 	ipf := newIpFilterRule()
@@ -128,24 +191,13 @@ func parseFlowDesc(flowDesc, ueIP string) (*ipFilterRule, error) {
 	}
 	ipf.proto = proto
 
-	// bring to common intermediate representation
-	xform := func(i int) {
-		switch fields[i] {
-		case "any":
-			fields[i] = Ipv4WildcardNetString
-		case "assigned":
-			if ueIP == "0.0.0.0" {
-				fields[i] = Ipv4WildcardNetString
-			} else if ueIP != "" && ueIP != "<nil>" {
-				fields[i] = ueIP
-			} else {
-				fields[i] = Ipv4WildcardNetString
-			}
-		}
+	if err := processFlowFields(fields, ipf, parseLog); err != nil {
+		return nil, err
 	}
 
-	if err := processFlowFields(fields, ipf, parseLog, xform); err != nil {
-		return nil, err
+	if src, dst := ipf.src.family(), ipf.dst.family(); src != 0 && dst != 0 && src != dst {
+		parseLog.Errorln("the endpoints are of different address families")
+		return nil, errBadFilterDesc
 	}
 
 	parseLog = parseLog.With("ip-filter", ipf)
@@ -154,7 +206,7 @@ func parseFlowDesc(flowDesc, ueIP string) (*ipFilterRule, error) {
 	return ipf, nil
 }
 
-func processFlowFields(fields []string, ipf *ipFilterRule, parseLog interface{ Errorln(...any) }, xform func(int)) error {
+func processFlowFields(fields []string, ipf *ipFilterRule, parseLog interface{ Errorln(...any) }) error {
 	for i := 3; i < len(fields); i++ {
 		switch fields[i] {
 		case "from":
@@ -162,7 +214,6 @@ func processFlowFields(fields []string, ipf *ipFilterRule, parseLog interface{ E
 			if i >= len(fields) {
 				return errBadFilterDesc
 			}
-			xform(i)
 
 			err := ipf.src.parseNet(fields[i])
 			if err != nil {
@@ -175,7 +226,6 @@ func processFlowFields(fields []string, ipf *ipFilterRule, parseLog interface{ E
 				if i >= len(fields) {
 					return errBadFilterDesc
 				}
-				xform(i)
 				err := ipf.src.parsePort(fields[i])
 				if err != nil {
 					parseLog.Errorln("src port parse failed", err)
@@ -187,7 +237,6 @@ func processFlowFields(fields []string, ipf *ipFilterRule, parseLog interface{ E
 			if i >= len(fields) {
 				return errBadFilterDesc
 			}
-			xform(i)
 
 			err := ipf.dst.parseNet(fields[i])
 			if err != nil {
@@ -200,7 +249,6 @@ func processFlowFields(fields []string, ipf *ipFilterRule, parseLog interface{ E
 				if i >= len(fields) {
 					return errBadFilterDesc
 				}
-				xform(i)
 				err := ipf.dst.parsePort(fields[i])
 				if err != nil {
 					parseLog.Errorln("dst port parse failed", err)

@@ -96,8 +96,7 @@ func (u *upf) sim(mode simMode, s *SimModeInfo) {
 		pdrN6Down := pdr{
 			srcIface: core,
 			appFilter: applicationFilter{
-				dstIP:     ip2int(ueip) + i,
-				dstIPMask: 0xFFFFFFFF,
+				dstIP: hostPrefix(ipv4WithOffset(ueip, i)),
 			},
 
 			srcIfaceMask: 0xFF,
@@ -113,13 +112,12 @@ func (u *upf) sim(mode simMode, s *SimModeInfo) {
 		}
 
 		pdrN9Down := pdr{
-			srcIface:     core,
-			tunnelTEID:   n9TEID + i,
-			tunnelIP4Dst: ip2int(u.coreIP),
+			srcIface:    core,
+			tunnelTEID:  n9TEID + i,
+			tunnelIPDst: hostPrefix(addrFromIP(u.coreIP)),
 
-			srcIfaceMask:     0xFF,
-			tunnelTEIDMask:   0xFFFFFFFF,
-			tunnelIP4DstMask: 0xFFFFFFFF,
+			srcIfaceMask:   0xFF,
+			tunnelTEIDMask: 0xFFFFFFFF,
 
 			precedence: 1,
 
@@ -133,17 +131,15 @@ func (u *upf) sim(mode simMode, s *SimModeInfo) {
 
 		// create/delete uplink pdr
 		pdrN6Up := pdr{
-			srcIface:     access,
-			tunnelIP4Dst: ip2int(u.accessIP),
-			tunnelTEID:   n3TEID + i,
+			srcIface:    access,
+			tunnelIPDst: hostPrefix(addrFromIP(u.accessIP)),
+			tunnelTEID:  n3TEID + i,
 			appFilter: applicationFilter{
-				srcIP:     ip2int(ueip) + i,
-				srcIPMask: 0xFFFFFFFF,
+				srcIP: hostPrefix(ipv4WithOffset(ueip, i)),
 			},
 
-			srcIfaceMask:     0xFF,
-			tunnelIP4DstMask: 0xFFFFFFFF,
-			tunnelTEIDMask:   0xFFFFFFFF,
+			srcIfaceMask:   0xFF,
+			tunnelTEIDMask: 0xFFFFFFFF,
 
 			precedence: 255,
 
@@ -156,17 +152,15 @@ func (u *upf) sim(mode simMode, s *SimModeInfo) {
 		}
 
 		pdrN9Up := pdr{
-			srcIface:     access,
-			tunnelIP4Dst: ip2int(u.accessIP),
-			tunnelTEID:   n3TEID + i,
+			srcIface:    access,
+			tunnelIPDst: hostPrefix(addrFromIP(u.accessIP)),
+			tunnelTEID:  n3TEID + i,
 			appFilter: applicationFilter{
-				dstIP:     ip2int(n9appip),
-				dstIPMask: 0xFFFFFFFF,
+				dstIP: hostPrefix(addrFromIP(n9appip)),
 			},
 
-			srcIfaceMask:     0xFF,
-			tunnelIP4DstMask: 0xFFFFFFFF,
-			tunnelTEIDMask:   0xFFFFFFFF,
+			srcIfaceMask:   0xFF,
+			tunnelTEIDMask: 0xFFFFFFFF,
 
 			precedence: 1,
 
@@ -185,13 +179,13 @@ func (u *upf) sim(mode simMode, s *SimModeInfo) {
 			farID: n3,
 			fseID: uint64(n3TEID + i),
 
-			applyAction:  ActionForward,
-			dstIntf:      ie.DstInterfaceAccess,
-			tunnelType:   0x1,
-			tunnelIP4Src: ip2int(u.accessIP),
-			tunnelIP4Dst: ip2int(enbip) + enbIdx,
-			tunnelTEID:   n3TEID + i,
-			tunnelPort:   tunnelGTPUPort,
+			applyAction: ActionForward,
+			dstIntf:     ie.DstInterfaceAccess,
+			tunnelType:  0x1,
+			tunnelIPSrc: addrFromIP(u.accessIP),
+			tunnelIPDst: ipv4WithOffset(enbip, enbIdx),
+			tunnelTEID:  n3TEID + i,
+			tunnelPort:  tunnelGTPUPort,
 		}
 
 		// create/delete uplink far
@@ -207,13 +201,13 @@ func (u *upf) sim(mode simMode, s *SimModeInfo) {
 			farID: n9,
 			fseID: uint64(n3TEID + i),
 
-			applyAction:  ActionForward,
-			dstIntf:      ie.DstInterfaceCore,
-			tunnelType:   0x1,
-			tunnelIP4Src: ip2int(u.coreIP),
-			tunnelIP4Dst: ip2int(aupfip),
-			tunnelTEID:   n9TEID + i,
-			tunnelPort:   tunnelGTPUPort,
+			applyAction: ActionForward,
+			dstIntf:     ie.DstInterfaceCore,
+			tunnelType:  0x1,
+			tunnelIPSrc: addrFromIP(u.coreIP),
+			tunnelIPDst: addrFromIP(aupfip),
+			tunnelTEID:  n9TEID + i,
+			tunnelPort:  tunnelGTPUPort,
 		}
 
 		fars := []far{farDown, farN6Up, farN9Up}

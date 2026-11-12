@@ -4,7 +4,7 @@
 package pfcpiface
 
 import (
-	"net"
+	"net/netip"
 	"testing"
 
 	"github.com/wmnsk/go-pfcp/ie"
@@ -296,10 +296,10 @@ func TestARollbackRemovesAnUpdatedRuleTheWriteMoved(t *testing.T) {
 	}
 
 	// It has to be removed at the key the write gave it, not the one the session holds.
-	if removed.pdrs[0].appFilter.dstIP != ip2int(net.ParseIP(secondUEAddress)) {
+	if removed.pdrs[0].appFilter.dstIP != hostPrefix(netip.MustParseAddr(secondUEAddress)) {
 		t.Fatalf("the rollback removed the PDR at %v, expected the address the refused "+
 			"write programmed it at (%s)",
-			int2ip(removed.pdrs[0].appFilter.dstIP), secondUEAddress)
+			removed.pdrs[0].appFilter.dstIP.Addr(), secondUEAddress)
 	}
 }
 
@@ -388,19 +388,19 @@ func TestARollbackRemovesBothWhatItCreatedAndWhatItMoved(t *testing.T) {
 			"one: %v", len(removed.pdrs), removed.pdrs)
 	}
 
-	at := map[uint32]uint32{}
+	at := map[uint32]netip.Prefix{}
 	for _, p := range removed.pdrs {
 		at[p.pdrID] = p.appFilter.dstIP
 	}
 
-	if at[secondPDRID] != ip2int(net.ParseIP(secondUEAddress)) {
+	if at[secondPDRID] != hostPrefix(netip.MustParseAddr(secondUEAddress)) {
 		t.Errorf("the created PDR was removed at %v, expected %s",
-			int2ip(at[secondPDRID]), secondUEAddress)
+			at[secondPDRID].Addr(), secondUEAddress)
 	}
 
-	if at[downlinkPDRID] != ip2int(net.ParseIP(thirdUEAddress)) {
+	if at[downlinkPDRID] != hostPrefix(netip.MustParseAddr(thirdUEAddress)) {
 		t.Errorf("the moved PDR was removed at %v, expected the address the refused "+
-			"write programmed it at (%s)", int2ip(at[downlinkPDRID]), thirdUEAddress)
+			"write programmed it at (%s)", at[downlinkPDRID].Addr(), thirdUEAddress)
 	}
 }
 
@@ -459,7 +459,7 @@ func TestARollbackRemovesARuleTheMessageCreatedAndThenMoved(t *testing.T) {
 
 	removed := rollbackDeletion(t, dp)
 
-	at := map[uint32]bool{}
+	at := map[netip.Prefix]bool{}
 	for _, p := range removed.pdrs {
 		if p.pdrID == secondPDRID {
 			at[p.appFilter.dstIP] = true
@@ -478,7 +478,7 @@ func TestARollbackRemovesARuleTheMessageCreatedAndThenMoved(t *testing.T) {
 		if !at[p.appFilter.dstIP] {
 			t.Errorf("the rollback did not remove PDR %d at %s; the refused write programmed "+
 				"it there, and no version of it existed before the message: %v",
-				secondPDRID, int2ip(p.appFilter.dstIP), removed.pdrs)
+				secondPDRID, p.appFilter.dstIP.Addr(), removed.pdrs)
 		}
 	}
 
@@ -486,7 +486,7 @@ func TestARollbackRemovesARuleTheMessageCreatedAndThenMoved(t *testing.T) {
 		t.Fatalf("the refused write programmed no PDR %d, so this test proves nothing", secondPDRID)
 	}
 
-	if !at[ip2int(net.ParseIP(thirdUEAddress))] {
+	if !at[hostPrefix(netip.MustParseAddr(thirdUEAddress))] {
 		t.Errorf("the rollback did not remove PDR %d at %s, the address the Update gave it: %v",
 			secondPDRID, thirdUEAddress, removed.pdrs)
 	}

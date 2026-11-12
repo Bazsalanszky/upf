@@ -6,6 +6,7 @@ package pfcpiface
 import (
 	"encoding/binary"
 	"net"
+	"net/netip"
 	"testing"
 )
 
@@ -20,14 +21,14 @@ func TestUpdateFAR_WithEndMarkerEnabled(t *testing.T) {
 			qers: make([]qer, 0),
 			fars: []far{
 				{
-					farID:        1,
-					fseID:        100,
-					tunnelTEID:   0x12345678,
-					tunnelIP4Src: ip2int(net.ParseIP("192.168.1.1")),
-					tunnelIP4Dst: ip2int(net.ParseIP("10.0.0.1")),
-					tunnelPort:   tunnelGTPUPort,
-					applyAction:  ActionForward,
-					dstIntf:      1,
+					farID:       1,
+					fseID:       100,
+					tunnelTEID:  0x12345678,
+					tunnelIPSrc: addrFromIP(net.ParseIP("192.168.1.1")),
+					tunnelIPDst: addrFromIP(net.ParseIP("10.0.0.1")),
+					tunnelPort:  tunnelGTPUPort,
+					applyAction: ActionForward,
+					dstIntf:     1,
 				},
 			},
 		},
@@ -39,8 +40,8 @@ func TestUpdateFAR_WithEndMarkerEnabled(t *testing.T) {
 		fseID:         100,
 		sendEndMarker: true, // End marker enabled
 		tunnelTEID:    0x87654321,
-		tunnelIP4Src:  ip2int(net.ParseIP("192.168.2.1")),
-		tunnelIP4Dst:  ip2int(net.ParseIP("10.0.0.2")),
+		tunnelIPSrc:   addrFromIP(net.ParseIP("192.168.2.1")),
+		tunnelIPDst:   addrFromIP(net.ParseIP("10.0.0.2")),
 		tunnelPort:    tunnelGTPUPort,
 		applyAction:   ActionForward,
 		dstIntf:       2,
@@ -78,11 +79,11 @@ func TestUpdateFAR_WithEndMarkerEnabled(t *testing.T) {
 	if updatedSessionFAR.tunnelTEID != 0x87654321 {
 		t.Errorf("expected updated TEID 0x87654321, got 0x%x", updatedSessionFAR.tunnelTEID)
 	}
-	if updatedSessionFAR.tunnelIP4Src != ip2int(net.ParseIP("192.168.2.1")) {
-		t.Errorf("expected updated source IP, got %v", int2ip(updatedSessionFAR.tunnelIP4Src))
+	if updatedSessionFAR.tunnelIPSrc != netip.MustParseAddr("192.168.2.1") {
+		t.Errorf("expected updated source IP, got %v", updatedSessionFAR.tunnelIPSrc)
 	}
-	if updatedSessionFAR.tunnelIP4Dst != ip2int(net.ParseIP("10.0.0.2")) {
-		t.Errorf("expected updated dest IP, got %v", int2ip(updatedSessionFAR.tunnelIP4Dst))
+	if updatedSessionFAR.tunnelIPDst != netip.MustParseAddr("10.0.0.2") {
+		t.Errorf("expected updated dest IP, got %v", updatedSessionFAR.tunnelIPDst)
 	}
 }
 
@@ -97,13 +98,13 @@ func TestUpdateFAR_WithEndMarkerDisabled(t *testing.T) {
 			qers: make([]qer, 0),
 			fars: []far{
 				{
-					farID:        2,
-					fseID:        100,
-					tunnelTEID:   0xAABBCCDD,
-					tunnelIP4Src: ip2int(net.ParseIP("172.16.1.1")),
-					tunnelIP4Dst: ip2int(net.ParseIP("10.1.1.1")),
-					tunnelPort:   tunnelGTPUPort,
-					applyAction:  ActionForward,
+					farID:       2,
+					fseID:       100,
+					tunnelTEID:  0xAABBCCDD,
+					tunnelIPSrc: addrFromIP(net.ParseIP("172.16.1.1")),
+					tunnelIPDst: addrFromIP(net.ParseIP("10.1.1.1")),
+					tunnelPort:  tunnelGTPUPort,
+					applyAction: ActionForward,
 				},
 			},
 		},
@@ -115,8 +116,8 @@ func TestUpdateFAR_WithEndMarkerDisabled(t *testing.T) {
 		fseID:         100,
 		sendEndMarker: false, // End marker disabled
 		tunnelTEID:    0x11223344,
-		tunnelIP4Src:  ip2int(net.ParseIP("172.16.2.1")),
-		tunnelIP4Dst:  ip2int(net.ParseIP("10.1.1.2")),
+		tunnelIPSrc:   addrFromIP(net.ParseIP("172.16.2.1")),
+		tunnelIPDst:   addrFromIP(net.ParseIP("10.1.1.2")),
 		tunnelPort:    tunnelGTPUPort,
 		applyAction:   ActionForward,
 	}
@@ -201,22 +202,22 @@ func TestUpdateFAR_MultipleFARs(t *testing.T) {
 			qers: make([]qer, 0),
 			fars: []far{
 				{
-					farID:        1,
-					tunnelTEID:   0x1111,
-					tunnelIP4Src: ip2int(net.ParseIP("1.1.1.1")),
-					tunnelIP4Dst: ip2int(net.ParseIP("2.2.2.2")),
+					farID:       1,
+					tunnelTEID:  0x1111,
+					tunnelIPSrc: addrFromIP(net.ParseIP("1.1.1.1")),
+					tunnelIPDst: addrFromIP(net.ParseIP("2.2.2.2")),
 				},
 				{
-					farID:        2,
-					tunnelTEID:   0x2222,
-					tunnelIP4Src: ip2int(net.ParseIP("3.3.3.3")),
-					tunnelIP4Dst: ip2int(net.ParseIP("4.4.4.4")),
+					farID:       2,
+					tunnelTEID:  0x2222,
+					tunnelIPSrc: addrFromIP(net.ParseIP("3.3.3.3")),
+					tunnelIPDst: addrFromIP(net.ParseIP("4.4.4.4")),
 				},
 				{
-					farID:        3,
-					tunnelTEID:   0x3333,
-					tunnelIP4Src: ip2int(net.ParseIP("5.5.5.5")),
-					tunnelIP4Dst: ip2int(net.ParseIP("6.6.6.6")),
+					farID:       3,
+					tunnelTEID:  0x3333,
+					tunnelIPSrc: addrFromIP(net.ParseIP("5.5.5.5")),
+					tunnelIPDst: addrFromIP(net.ParseIP("6.6.6.6")),
 				},
 			},
 		},
@@ -269,10 +270,10 @@ func TestAddEndMarker_PacketStructure(t *testing.T) {
 		{
 			name: "Standard end marker",
 			farItem: far{
-				farID:        10,
-				tunnelTEID:   0xDEADBEEF,
-				tunnelIP4Src: ip2int(net.ParseIP("192.168.100.1")),
-				tunnelIP4Dst: ip2int(net.ParseIP("10.20.30.40")),
+				farID:       10,
+				tunnelTEID:  0xDEADBEEF,
+				tunnelIPSrc: addrFromIP(net.ParseIP("192.168.100.1")),
+				tunnelIPDst: addrFromIP(net.ParseIP("10.20.30.40")),
 			},
 			expectedTEID: 0xDEADBEEF,
 			expectedSrc:  "192.168.100.1",
@@ -281,10 +282,10 @@ func TestAddEndMarker_PacketStructure(t *testing.T) {
 		{
 			name: "End marker with zero TEID",
 			farItem: far{
-				farID:        20,
-				tunnelTEID:   0,
-				tunnelIP4Src: ip2int(net.ParseIP("172.16.0.1")),
-				tunnelIP4Dst: ip2int(net.ParseIP("192.168.0.1")),
+				farID:       20,
+				tunnelTEID:  0,
+				tunnelIPSrc: addrFromIP(net.ParseIP("172.16.0.1")),
+				tunnelIPDst: addrFromIP(net.ParseIP("192.168.0.1")),
 			},
 			expectedTEID: 0,
 			expectedSrc:  "172.16.0.1",
