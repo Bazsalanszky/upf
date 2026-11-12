@@ -6,6 +6,7 @@ package pfcpiface
 import (
 	"math"
 	"net"
+	"net/netip"
 	"reflect"
 	"testing"
 
@@ -47,18 +48,17 @@ func Test_parsePDR(t *testing.T) {
 				ie.NewQERID(qerID),
 			),
 			expected: &pdr{
-				pdrID:            uint32(pdrID), // go-pfcp uses uint16 to create PDRIDs, while in pfcpiface we use uint32
-				precedence:       precedence,
-				tunnelIP4Dst:     ip2int(N3Address),
-				tunnelIP4DstMask: 0xffffffff, // 32 bit mask
-				srcIface:         access,
-				srcIfaceMask:     0xff,
-				fseID:            FSEID,
-				tunnelTEID:       teid,
-				tunnelTEIDMask:   0xffffffff,
-				farID:            farID,
-				qerIDList:        []uint32{qerID},
-				needDecap:        0x1, // OuterHeaderRemoval IE is present for uplink PDRs
+				pdrID:          uint32(pdrID), // go-pfcp uses uint16 to create PDRIDs, while in pfcpiface we use uint32
+				precedence:     precedence,
+				tunnelIPDst:    hostPrefix(addrFromIP(N3Address)), // a /32
+				srcIface:       access,
+				srcIfaceMask:   0xff,
+				fseID:          FSEID,
+				tunnelTEID:     teid,
+				tunnelTEIDMask: 0xffffffff,
+				farID:          farID,
+				qerIDList:      []uint32{qerID},
+				needDecap:      0x1, // OuterHeaderRemoval IE is present for uplink PDRs
 			},
 			description: "Valid Uplink Create PDR input",
 		},
@@ -79,11 +79,10 @@ func Test_parsePDR(t *testing.T) {
 				farID:        farID,
 				srcIface:     core,
 				srcIfaceMask: 0xff,
-				ueAddress:    ip2int(UEAddress),
+				ueAddress:    addrFromIP(UEAddress),
 				qerIDList:    []uint32{qerID},
 				appFilter: applicationFilter{
-					dstIPMask: math.MaxUint32,
-					dstIP:     ip2int(UEAddress),
+					dstIP: hostPrefix(addrFromIP(UEAddress)), // a /32
 				},
 			},
 			description: "Valid downlink Update PDR input",
@@ -105,11 +104,10 @@ func Test_parsePDR(t *testing.T) {
 				farID:        farID,
 				srcIface:     core,
 				srcIfaceMask: 0xff,
-				ueAddress:    ip2int(UEAddress),
+				ueAddress:    addrFromIP(UEAddress),
 				qerIDList:    []uint32{qerID},
 				appFilter: applicationFilter{
-					dstIPMask: math.MaxUint32,
-					dstIP:     ip2int(UEAddress),
+					dstIP: hostPrefix(addrFromIP(UEAddress)), // a /32
 				},
 			},
 			description: "Valid downlink Create PDR input",
@@ -612,13 +610,11 @@ func Test_pdr_parseSDFFilter(t *testing.T) {
 			sdfIE:     newFilter("permit out udp from 192.168.1.1/32 to assigned 80-400"),
 			direction: core,
 			wantAppFilter: applicationFilter{
-				srcIP:        ip2int(net.ParseIP(ipAddrSecondary)),
-				dstIP:        ip2int(net.ParseIP(ueAddress)),
+				srcIP:        hostPrefix(netip.MustParseAddr(ipAddrSecondary)),
+				dstIP:        hostPrefix(netip.MustParseAddr(ueAddress)),
 				srcPortRange: newRangeMatchPortRange(80, 400),
 				dstPortRange: newWildcardPortRange(),
 				proto:        17,
-				srcIPMask:    math.MaxUint32,
-				dstIPMask:    math.MaxUint32,
 				protoMask:    math.MaxUint8,
 			},
 			wantErr: false,
@@ -628,13 +624,11 @@ func Test_pdr_parseSDFFilter(t *testing.T) {
 			sdfIE:     newFilter("permit out udp from 192.168.1.1/32 to assigned 80-400"),
 			direction: access,
 			wantAppFilter: applicationFilter{
-				srcIP:        ip2int(net.ParseIP(ueAddress)),
-				dstIP:        ip2int(net.ParseIP(ipAddrSecondary)),
+				srcIP:        hostPrefix(netip.MustParseAddr(ueAddress)),
+				dstIP:        hostPrefix(netip.MustParseAddr(ipAddrSecondary)),
 				srcPortRange: newWildcardPortRange(),
 				dstPortRange: newRangeMatchPortRange(80, 400),
 				proto:        17,
-				srcIPMask:    math.MaxUint32,
-				dstIPMask:    math.MaxUint32,
 				protoMask:    math.MaxUint8,
 			},
 			wantErr: false,
@@ -644,13 +638,11 @@ func Test_pdr_parseSDFFilter(t *testing.T) {
 			sdfIE:     newFilter("permit out udp from 192.168.1.1/32 80-400 to assigned"),
 			direction: core,
 			wantAppFilter: applicationFilter{
-				srcIP:        ip2int(net.ParseIP(ipAddrSecondary)),
-				dstIP:        ip2int(net.ParseIP(ueAddress)),
+				srcIP:        hostPrefix(netip.MustParseAddr(ipAddrSecondary)),
+				dstIP:        hostPrefix(netip.MustParseAddr(ueAddress)),
 				srcPortRange: newRangeMatchPortRange(80, 400),
 				dstPortRange: newWildcardPortRange(),
 				proto:        17,
-				srcIPMask:    math.MaxUint32,
-				dstIPMask:    math.MaxUint32,
 				protoMask:    math.MaxUint8,
 			},
 			wantErr: false,
@@ -660,13 +652,11 @@ func Test_pdr_parseSDFFilter(t *testing.T) {
 			sdfIE:     newFilter("permit out udp from 192.168.1.1/32 80-400 to assigned"),
 			direction: access,
 			wantAppFilter: applicationFilter{
-				srcIP:        ip2int(net.ParseIP(ueAddress)),
-				dstIP:        ip2int(net.ParseIP(ipAddrSecondary)),
+				srcIP:        hostPrefix(netip.MustParseAddr(ueAddress)),
+				dstIP:        hostPrefix(netip.MustParseAddr(ipAddrSecondary)),
 				srcPortRange: newWildcardPortRange(),
 				dstPortRange: newRangeMatchPortRange(80, 400),
 				proto:        17,
-				srcIPMask:    math.MaxUint32,
-				dstIPMask:    math.MaxUint32,
 				protoMask:    math.MaxUint8,
 			},
 			wantErr: false,
@@ -690,7 +680,7 @@ func Test_pdr_parseSDFFilter(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			p := &pdr{
-				ueAddress: ip2int(net.ParseIP(ipAddrPrimary)),
+				ueAddress: netip.MustParseAddr(ipAddrPrimary),
 				srcIface:  tt.direction,
 			}
 			if err := p.parseSDFFilter(tt.sdfIE); (err != nil) != tt.wantErr {
@@ -733,10 +723,9 @@ func Test_pdr_parsePDI(t *testing.T) {
 			wantPDR: pdr{
 				srcIface:     access,
 				srcIfaceMask: math.MaxUint8,
-				ueAddress:    ip2int(net.ParseIP(ueAddress)),
+				ueAddress:    netip.MustParseAddr(ueAddress),
 				appFilter: applicationFilter{
-					srcIP:     ip2int(net.ParseIP(ueAddress)),
-					srcIPMask: math.MaxUint32,
+					srcIP: hostPrefix(netip.MustParseAddr(ueAddress)),
 				},
 			},
 			wantErr: false,
@@ -752,10 +741,9 @@ func Test_pdr_parsePDI(t *testing.T) {
 			wantPDR: pdr{
 				srcIface:     core,
 				srcIfaceMask: math.MaxUint8,
-				ueAddress:    ip2int(net.ParseIP(ueAddress)),
+				ueAddress:    netip.MustParseAddr(ueAddress),
 				appFilter: applicationFilter{
-					dstIP:     ip2int(net.ParseIP(ueAddress)),
-					dstIPMask: math.MaxUint32,
+					dstIP: hostPrefix(netip.MustParseAddr(ueAddress)),
 				},
 			},
 			wantErr: false,
@@ -785,17 +773,14 @@ func Test_pdr_parsePDI(t *testing.T) {
 
 func keyedPDR() pdr {
 	return pdr{
-		srcIface:         core,
-		srcIfaceMask:     0xff,
-		tunnelIP4Dst:     0x0a000001,
-		tunnelIP4DstMask: 0xffffffff,
-		tunnelTEID:       0x10,
-		tunnelTEIDMask:   0xffffffff,
+		srcIface:       core,
+		srcIfaceMask:   0xff,
+		tunnelIPDst:    netip.MustParsePrefix("10.0.0.1/32"),
+		tunnelTEID:     0x10,
+		tunnelTEIDMask: 0xffffffff,
 		appFilter: applicationFilter{
-			srcIP:        0x0a000002,
-			srcIPMask:    0xffffffff,
-			dstIP:        0x0a000003,
-			dstIPMask:    0xffffffff,
+			srcIP:        netip.MustParsePrefix("10.0.0.2/32"),
+			dstIP:        netip.MustParsePrefix("10.0.0.3/32"),
 			proto:        17,
 			protoMask:    0xff,
 			srcPortRange: newRangeMatchPortRange(100, 200),
@@ -811,14 +796,14 @@ func TestAPdrMovesWhenAKeyFieldChanges(t *testing.T) {
 	}{
 		{"source interface", func(p *pdr) { p.srcIface = access }},
 		{"source interface mask", func(p *pdr) { p.srcIfaceMask = 0 }},
-		{"tunnel destination", func(p *pdr) { p.tunnelIP4Dst++ }},
-		{"tunnel destination mask", func(p *pdr) { p.tunnelIP4DstMask = 0 }},
+		{"tunnel destination", func(p *pdr) { p.tunnelIPDst = hostPrefix(p.tunnelIPDst.Addr().Next()) }},
+		{"tunnel destination mask", func(p *pdr) { p.tunnelIPDst = netip.Prefix{} }},
 		{"tunnel TEID", func(p *pdr) { p.tunnelTEID++ }},
 		{"tunnel TEID mask", func(p *pdr) { p.tunnelTEIDMask = 0 }},
-		{"source address", func(p *pdr) { p.appFilter.srcIP++ }},
-		{"source address mask", func(p *pdr) { p.appFilter.srcIPMask = 0 }},
-		{"destination address", func(p *pdr) { p.appFilter.dstIP++ }},
-		{"destination address mask", func(p *pdr) { p.appFilter.dstIPMask = 0 }},
+		{"source address", func(p *pdr) { p.appFilter.srcIP = hostPrefix(p.appFilter.srcIP.Addr().Next()) }},
+		{"source address mask", func(p *pdr) { p.appFilter.srcIP = netip.PrefixFrom(p.appFilter.srcIP.Addr(), 24).Masked() }},
+		{"destination address", func(p *pdr) { p.appFilter.dstIP = hostPrefix(p.appFilter.dstIP.Addr().Next()) }},
+		{"destination address mask", func(p *pdr) { p.appFilter.dstIP = netip.PrefixFrom(p.appFilter.dstIP.Addr(), 24).Masked() }},
 		{"protocol", func(p *pdr) { p.appFilter.proto++ }},
 		{"protocol mask", func(p *pdr) { p.appFilter.protoMask = 0 }},
 		{"source port range", func(p *pdr) { p.appFilter.srcPortRange = newRangeMatchPortRange(100, 201) }},

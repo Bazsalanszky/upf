@@ -6,6 +6,7 @@ package pfcpiface
 import (
 	"errors"
 	"net"
+	"net/netip"
 	"strings"
 
 	"github.com/omec-project/upf-epc/logger"
@@ -23,6 +24,16 @@ var (
 	ErrCauseMissing    = errors.New("mandatory Cause IE missing")
 	ErrAssocReleasing  = errors.New("the PFCP association is being released")
 )
+
+// fseidAddr is the address a CP F-SEID carries, IPv4 if it has one. It labels the rules
+// of the session in logs and nothing else.
+func fseidAddr(f *ie.FSEIDFields) netip.Addr {
+	if a := addrFromIP(f.IPv4Address); a.IsValid() {
+		return a
+	}
+
+	return addrFromIP(f.IPv6Address)
+}
 
 func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (message.Message, error) {
 	upf := pConn.upf
@@ -89,9 +100,8 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 	}
 
 	remoteSEID := fseid.SEID
-	// The CP F-SEID's address only labels rules in logs. An IPv6-only one is 0 here.
-	// TODO(ipv6-p2): keep it as a netip.Addr with the rest of the rule model.
-	fseidIP := ip2int(fseid.IPv4Address)
+	// The CP F-SEID's address only labels rules in logs.
+	fseidIP := fseidAddr(fseid)
 
 	errProcessReply := func(err error, cause uint8) (message.Message, error) {
 		// Build response message
@@ -182,8 +192,7 @@ func (pConn *PFCPConn) handleSessionEstablishmentRequest(msg message.Message) (m
 			p.tunnelTEID = fteid
 			p.tunnelTEIDMask = 0xFFFFFFFF
 			// TODO(ipv6-p2): the chosen F-TEID is the IPv4 N3 address only (no CHV6).
-			p.tunnelIP4Dst = ip2int(upf.accessIP)
-			p.tunnelIP4DstMask = 0xFFFFFFFF
+			p.tunnelIPDst = hostPrefix(addrFromIP(upf.accessIP))
 		}
 
 		p.fseidIP = fseidIP
@@ -392,13 +401,13 @@ func (pConn *PFCPConn) handleSessionModificationRequest(msg message.Message) (me
 	before := session.PacketForwardingRules
 	session.PacketForwardingRules = before.Clone()
 
-	var fseidIP uint32
+	var fseidIP netip.Addr
 
 	if smreq.CPFSEID != nil {
 		fseid, err := smreq.CPFSEID.FSEID()
 		if err == nil {
 			session.remoteSEID = fseid.SEID
-			fseidIP = ip2int(fseid.IPv4Address) // TODO(ipv6-p2): as in the establishment
+			fseidIP = fseidAddr(fseid)
 
 			logger.PfcpLog.Debugln("updated FSEID from session modification request")
 		}

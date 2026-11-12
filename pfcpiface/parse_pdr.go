@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"math"
 	"net"
+	"net/netip"
 
 	"github.com/omec-project/upf-epc/logger"
 	"github.com/wmnsk/go-pfcp/ie"
@@ -281,35 +282,37 @@ func buildRulesFromRange(
 	return rules
 }
 
+// applicationFilter is the part of a PDR's match that is about the packet itself. The
+// addresses are match prefixes (see matchPrefix): the zero Prefix matches any address.
 type applicationFilter struct {
-	srcIP        uint32
-	dstIP        uint32
+	srcIP        netip.Prefix
+	dstIP        netip.Prefix
 	srcPortRange portRange
 	dstPortRange portRange
 	proto        uint8
 
-	srcIPMask uint32
-	dstIPMask uint32
 	protoMask uint8
 }
 
 type pdr struct {
 	UPAllocateFteid bool
 	srcIface        uint8
-	tunnelIP4Dst    uint32
-	tunnelTEID      uint32
-	ueAddress       uint32
+	// tunnelIPDst is the F-TEID address the PDR matches GTP-U packets on, as a host
+	// prefix; the zero Prefix matches any.
+	tunnelIPDst netip.Prefix
+	tunnelTEID  uint32
+	// ueAddress is the UE's IPv4 address; the zero Addr when the PDR names none.
+	ueAddress netip.Addr
 
-	srcIfaceMask     uint8
-	tunnelIP4DstMask uint32
-	tunnelTEIDMask   uint32
+	srcIfaceMask   uint8
+	tunnelTEIDMask uint32
 
 	appFilter applicationFilter
 
 	precedence  uint32
 	pdrID       uint32
 	fseID       uint64
-	fseidIP     uint32
+	fseidIP     netip.Addr
 	ctrID       uint32
 	farID       uint32
 	qerIDList   []uint32
@@ -333,9 +336,8 @@ func needAllocIP(ueIPaddr *ie.UEIPAddressFields) bool {
 }
 
 func (af applicationFilter) String() string {
-	return fmt.Sprintf("ApplicationFilter(srcIP=%v/%x, dstIP=%v/%x, proto=%v/%x, srcPort=%v, dstPort=%v)",
-		int2ip(af.srcIP), af.srcIPMask, int2ip(af.dstIP), af.dstIPMask, af.proto,
-		af.protoMask, af.srcPortRange, af.dstPortRange)
+	return fmt.Sprintf("ApplicationFilter(srcIP=%v, dstIP=%v, proto=%v/%x, srcPort=%v, dstPort=%v)",
+		af.srcIP, af.dstIP, af.proto, af.protoMask, af.srcPortRange, af.dstPortRange)
 }
 
 // occupiesSameEntryAs reports whether both rules would land on the same datapath entry.
@@ -352,14 +354,11 @@ func (af applicationFilter) String() string {
 func (p pdr) occupiesSameEntryAs(other pdr) bool {
 	return p.srcIface == other.srcIface &&
 		p.srcIfaceMask == other.srcIfaceMask &&
-		p.tunnelIP4Dst == other.tunnelIP4Dst &&
-		p.tunnelIP4DstMask == other.tunnelIP4DstMask &&
+		p.tunnelIPDst == other.tunnelIPDst &&
 		p.tunnelTEID == other.tunnelTEID &&
 		p.tunnelTEIDMask == other.tunnelTEIDMask &&
 		p.appFilter.srcIP == other.appFilter.srcIP &&
-		p.appFilter.srcIPMask == other.appFilter.srcIPMask &&
 		p.appFilter.dstIP == other.appFilter.dstIP &&
-		p.appFilter.dstIPMask == other.appFilter.dstIPMask &&
 		p.appFilter.proto == other.appFilter.proto &&
 		p.appFilter.protoMask == other.appFilter.protoMask &&
 		p.appFilter.srcPortRange.sameMatch(other.appFilter.srcPortRange) &&
@@ -367,18 +366,18 @@ func (p pdr) occupiesSameEntryAs(other pdr) bool {
 }
 
 func (p pdr) String() string {
-	return fmt.Sprintf("PDR(id=%v, F-SEID=%v, srcIface=%v, tunnelIPv4Dst=%v/%x, "+
+	return fmt.Sprintf("PDR(id=%v, F-SEID=%v, srcIface=%v, tunnelIPDst=%v, "+
 		"tunnelTEID=%v/%x, ueAddress=%v, applicationFilter=%v, precedence=%v, F-SEID IP=%v, "+
 		"counterID=%v, farID=%v, qerIDs=%v, needDecap=%v, allocIPFlag=%v)",
-		p.pdrID, p.fseID, p.srcIface, int2ip(p.tunnelIP4Dst), p.tunnelIP4DstMask,
-		p.tunnelTEID, p.tunnelTEIDMask, int2ip(p.ueAddress), p.appFilter, p.precedence,
+		p.pdrID, p.fseID, p.srcIface, p.tunnelIPDst,
+		p.tunnelTEID, p.tunnelTEIDMask, p.ueAddress, p.appFilter, p.precedence,
 		p.fseidIP, p.ctrID, p.farID, p.qerIDList, p.needDecap, p.allocIPFlag)
 }
 
 func (p pdr) IsAppFilterEmpty() bool {
 	return p.appFilter.proto == 0 &&
-		((p.IsUplink() && p.appFilter.dstIP == 0 && p.appFilter.dstPortRange.isWildcardMatch()) ||
-			(p.IsDownlink() && p.appFilter.srcIP == 0 && p.appFilter.srcPortRange.isWildcardMatch()))
+		((p.IsUplink() && isZeroAddr(p.appFilter.dstIP.Addr()) && p.appFilter.dstPortRange.isWildcardMatch()) ||
+			(p.IsDownlink() && isZeroAddr(p.appFilter.srcIP.Addr()) && p.appFilter.srcPortRange.isWildcardMatch()))
 }
 
 func (p pdr) IsUplink() bool {
@@ -438,9 +437,18 @@ func (p *pdr) parseUEAddressIE(ueAddrIE *ie.IE, ippool *IPPool) error {
 			"IP address length", len(ueIP4))
 	}
 
-	p.ueAddress = ip2int(ueIP4)
+	p.ueAddress = addrFromIP(ueIP4)
 
 	return nil
+}
+
+// ueAddrString is the UE address as parseFlowDesc takes it: empty for none.
+func ueAddrString(a netip.Addr) string {
+	if !a.IsValid() {
+		return ""
+	}
+
+	return a.String()
 }
 
 func (p *pdr) parseSourceInterfaceIE(srcIfaceIE *ie.IE) error {
@@ -479,8 +487,7 @@ func (p *pdr) parseFTEID(teidIE *ie.IE) error {
 	} else if teid != 0 {
 		p.tunnelTEID = teid
 		p.tunnelTEIDMask = 0xFFFFFFFF
-		p.tunnelIP4Dst = ip2int(fteid.IPv4Address)
-		p.tunnelIP4DstMask = 0xFFFFFFFF
+		p.tunnelIPDst = hostPrefix(addrFromIP(fteid.IPv4Address))
 	}
 
 	return nil
@@ -505,7 +512,7 @@ func (p *pdr) parseApplicationID(ie *ie.IE, appPFDs map[string]appPFD) error {
 		logger := logger.PfcpLog.With("Application ID", apfd.appID, "Flow Description", flowDesc)
 		logger.Debug("Parsing flow description of Application ID IE")
 
-		ipf, err := parseFlowDesc(flowDesc, int2ip(p.ueAddress).String())
+		ipf, err := parseFlowDesc(flowDesc, ueAddrString(p.ueAddress))
 		if err != nil {
 			return errBadFilterDesc
 		}
@@ -519,10 +526,8 @@ func (p *pdr) parseApplicationID(ie *ie.IE, appPFDs map[string]appPFD) error {
 				p.appFilter.protoMask = math.MaxUint8
 			}
 			// TODO: Verify assumption that flow description in case of PFD is to be taken as-is
-			p.appFilter.dstIP = ip2int(ipf.dst.IPNet.IP)
-			p.appFilter.dstIPMask = ipMask2int(ipf.dst.IPNet.Mask)
-			p.appFilter.srcIP = ip2int(ipf.src.IPNet.IP)
-			p.appFilter.srcIPMask = ipMask2int(ipf.src.IPNet.Mask)
+			p.appFilter.dstIP = prefixFromIPNet(ipf.dst.IPNet)
+			p.appFilter.srcIP = prefixFromIPNet(ipf.src.IPNet)
 			p.appFilter.dstPortRange = ipf.dst.ports
 			p.appFilter.srcPortRange = ipf.src.ports
 
@@ -558,7 +563,7 @@ func (p *pdr) parseSDFFilter(ie *ie.IE) error {
 
 	logger.PfcpLog.With("Flow Description", flowDesc).Debugln("parsing Flow Description from SDF Filter")
 
-	ipf, err := parseFlowDesc(flowDesc, int2ip(p.ueAddress).String())
+	ipf, err := parseFlowDesc(flowDesc, ueAddrString(p.ueAddress))
 	if err != nil {
 		return errBadFilterDesc
 	}
@@ -570,10 +575,8 @@ func (p *pdr) parseSDFFilter(ie *ie.IE) error {
 
 	switch p.srcIface {
 	case core:
-		p.appFilter.dstIP = ip2int(ipf.dst.IPNet.IP)
-		p.appFilter.dstIPMask = ipMask2int(ipf.dst.IPNet.Mask)
-		p.appFilter.srcIP = ip2int(ipf.src.IPNet.IP)
-		p.appFilter.srcIPMask = ipMask2int(ipf.src.IPNet.Mask)
+		p.appFilter.dstIP = prefixFromIPNet(ipf.dst.IPNet)
+		p.appFilter.srcIP = prefixFromIPNet(ipf.src.IPNet)
 		p.appFilter.dstPortRange = ipf.dst.ports
 		p.appFilter.srcPortRange = ipf.src.ports
 
@@ -584,10 +587,8 @@ func (p *pdr) parseSDFFilter(ie *ie.IE) error {
 			p.appFilter.dstPortRange = newWildcardPortRange()
 		}
 	case access:
-		p.appFilter.srcIP = ip2int(ipf.dst.IPNet.IP)
-		p.appFilter.srcIPMask = ipMask2int(ipf.dst.IPNet.Mask)
-		p.appFilter.dstIP = ip2int(ipf.src.IPNet.IP)
-		p.appFilter.dstIPMask = ipMask2int(ipf.src.IPNet.Mask)
+		p.appFilter.srcIP = prefixFromIPNet(ipf.dst.IPNet)
+		p.appFilter.dstIP = prefixFromIPNet(ipf.src.IPNet)
 		// Ports are flipped for access PDRs
 		p.appFilter.dstPortRange = ipf.src.ports
 		p.appFilter.srcPortRange = ipf.dst.ports
@@ -609,12 +610,10 @@ func (p *pdr) parsePDI(pdiIEs []*ie.IE, appPFDs map[string]appPFD, ippool *IPPoo
 	}
 	// initialize application filter with UE address;
 	// it can be overwritten by parseSDFFilter() later.
-	if p.IsDownlink() && p.ueAddress != 0 {
-		p.appFilter.dstIP = p.ueAddress
-		p.appFilter.dstIPMask = math.MaxUint32 // /32
-	} else if p.IsUplink() && p.ueAddress != 0 {
-		p.appFilter.srcIP = p.ueAddress
-		p.appFilter.srcIPMask = math.MaxUint32 // /32
+	if p.IsDownlink() && !isZeroAddr(p.ueAddress) {
+		p.appFilter.dstIP = hostPrefix(p.ueAddress)
+	} else if p.IsUplink() && !isZeroAddr(p.ueAddress) {
+		p.appFilter.srcIP = hostPrefix(p.ueAddress)
 	}
 
 	// make another iteration because Application ID and SDF Filter depend on UE IP Address IE

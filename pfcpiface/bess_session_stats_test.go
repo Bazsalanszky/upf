@@ -6,7 +6,7 @@ package pfcpiface
 import (
 	"context"
 	"fmt"
-	"net"
+	"net/netip"
 	"slices"
 	"strings"
 	"testing"
@@ -101,7 +101,7 @@ func newSessionStatsNode(t *testing.T) *PFCPNode {
 	err := store.PutSession(PFCPSession{
 		localSEID: statsTestFSEID,
 		PacketForwardingRules: PacketForwardingRules{pdrs: []pdr{
-			{srcIface: access, ueAddress: ip2int(net.ParseIP(statsTestUEIP))},
+			{srcIface: access, ueAddress: netip.MustParseAddr(statsTestUEIP)},
 			{srcIface: core},
 		}},
 	})

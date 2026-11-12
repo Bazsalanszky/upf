@@ -477,7 +477,7 @@ func (b *bess) SummaryGtpuLatency(uc *upfCollector, ch chan<- prometheus.Metric)
 	}
 
 	for _, post := range gtpuPathStatsResp.Statistics {
-		gnbIpString := int2ip(post.GnbIp).String()
+		gnbIpString := addrFromIPv4Field(post.GnbIp).String()
 
 		ch <- prometheus.MustNewConstMetric(
 			uc.gtpupackets,
@@ -783,8 +783,8 @@ func resolveUEIP(
 
 		// Try to find the N6 uplink PDR with the UE IP.
 		for _, p := range session.pdrs {
-			if p.IsUplink() && p.ueAddress > 0 {
-				ueIpString = int2ip(p.ueAddress).String()
+			if p.IsUplink() && !isZeroAddr(p.ueAddress) {
+				ueIpString = p.ueAddress.String()
 				logger.BessLog.Debugln(p.fseID, " -> ", ueIpString)
 				break
 			}
@@ -1212,6 +1212,37 @@ func (b *bess) processPDR(ctx context.Context, arg *anypb.Any, method upfMsgType
 	return commandOutcome("pdrLookup", method, methods[method], resp, err)
 }
 
+// pdrIPv4Match is a PDR's address match in the 32-bit fields of the datapath's PDR
+// table.
+type pdrIPv4Match struct {
+	tunnelDst, tunnelDstMask uint32
+	srcIP, srcIPMask         uint32
+	dstIP, dstIPMask         uint32
+}
+
+// ipv4Match converts the PDR's address match for the datapath, and refuses one that is
+// not IPv4.
+func (p pdr) ipv4Match() (pdrIPv4Match, error) {
+	var (
+		m   pdrIPv4Match
+		err error
+	)
+
+	if m.tunnelDst, m.tunnelDstMask, err = ipv4MatchFields(p.tunnelIPDst); err != nil {
+		return m, fmt.Errorf("PDR %d tunnel destination: %w", p.pdrID, err)
+	}
+
+	if m.srcIP, m.srcIPMask, err = ipv4MatchFields(p.appFilter.srcIP); err != nil {
+		return m, fmt.Errorf("PDR %d source address: %w", p.pdrID, err)
+	}
+
+	if m.dstIP, m.dstIPMask, err = ipv4MatchFields(p.appFilter.dstIP); err != nil {
+		return m, fmt.Errorf("PDR %d destination address: %w", p.pdrID, err)
+	}
+
+	return m, nil
+}
+
 func (b *bess) addPDR(ctx context.Context, done chan<- bool, p pdr) {
 	go func() {
 		completed := false
@@ -1229,6 +1260,12 @@ func (b *bess) addPDR(ctx context.Context, done chan<- bool, p pdr) {
 			break
 		}
 
+		m, err := p.ipv4Match()
+		if err != nil {
+			logger.BessLog.Errorln(err)
+			return
+		}
+
 		// Translate port ranges into ternary rule(s) and insert them one-by-one.
 		portRules, err := CreatePortRangeCartesianProduct(p.appFilter.srcPortRange, p.appFilter.dstPortRange)
 		if err != nil {
@@ -1244,20 +1281,20 @@ func (b *bess) addPDR(ctx context.Context, done chan<- bool, p pdr) {
 				Priority: int64(math.MaxUint32 - p.precedence),
 				Values: []*pb.FieldData{
 					intEnc(uint64(p.srcIface)),        /* src_iface */
-					intEnc(uint64(p.tunnelIP4Dst)),    /* tunnel_ipv4_dst */
+					intEnc(uint64(m.tunnelDst)),       /* tunnel_ipv4_dst */
 					intEnc(uint64(p.tunnelTEID)),      /* enb_teid */
-					intEnc(uint64(p.appFilter.srcIP)), /* ueaddr ip*/
-					intEnc(uint64(p.appFilter.dstIP)), /* inet ip */
+					intEnc(uint64(m.srcIP)),           /* ueaddr ip*/
+					intEnc(uint64(m.dstIP)),           /* inet ip */
 					intEnc(uint64(r.srcPort)),         /* ue port */
 					intEnc(uint64(r.dstPort)),         /* inet port */
 					intEnc(uint64(p.appFilter.proto)), /* proto id */
 				},
 				Masks: []*pb.FieldData{
 					intEnc(uint64(p.srcIfaceMask)),        /* src_iface-mask */
-					intEnc(uint64(p.tunnelIP4DstMask)),    /* tunnel_ipv4_dst-mask */
+					intEnc(uint64(m.tunnelDstMask)),       /* tunnel_ipv4_dst-mask */
 					intEnc(uint64(p.tunnelTEIDMask)),      /* enb_teid-mask */
-					intEnc(uint64(p.appFilter.srcIPMask)), /* ueaddr ip-mask */
-					intEnc(uint64(p.appFilter.dstIPMask)), /* inet ip-mask */
+					intEnc(uint64(m.srcIPMask)),           /* ueaddr ip-mask */
+					intEnc(uint64(m.dstIPMask)),           /* inet ip-mask */
 					intEnc(uint64(r.srcMask)),             /* ue port-mask */
 					intEnc(uint64(r.dstMask)),             /* inet port-mask */
 					intEnc(uint64(p.appFilter.protoMask)), /* proto id-mask */
@@ -1295,6 +1332,12 @@ func (b *bess) delPDR(ctx context.Context, done chan<- bool, p pdr) {
 			err error
 		)
 
+		m, err := p.ipv4Match()
+		if err != nil {
+			logger.BessLog.Errorln(err)
+			return
+		}
+
 		// Translate port ranges into ternary rule(s) and insert them one-by-one.
 		portRules, err := CreatePortRangeCartesianProduct(p.appFilter.srcPortRange, p.appFilter.dstPortRange)
 		if err != nil {
@@ -1306,20 +1349,20 @@ func (b *bess) delPDR(ctx context.Context, done chan<- bool, p pdr) {
 			f := &pb.WildcardMatchCommandDeleteArg{
 				Values: []*pb.FieldData{
 					intEnc(uint64(p.srcIface)),        /* src_iface */
-					intEnc(uint64(p.tunnelIP4Dst)),    /* tunnel_ipv4_dst */
+					intEnc(uint64(m.tunnelDst)),       /* tunnel_ipv4_dst */
 					intEnc(uint64(p.tunnelTEID)),      /* enb_teid */
-					intEnc(uint64(p.appFilter.srcIP)), /* ueaddr ip*/
-					intEnc(uint64(p.appFilter.dstIP)), /* inet ip */
+					intEnc(uint64(m.srcIP)),           /* ueaddr ip*/
+					intEnc(uint64(m.dstIP)),           /* inet ip */
 					intEnc(uint64(r.srcPort)),         /* ue port */
 					intEnc(uint64(r.dstPort)),         /* inet port */
 					intEnc(uint64(p.appFilter.proto)), /* proto id */
 				},
 				Masks: []*pb.FieldData{
 					intEnc(uint64(p.srcIfaceMask)),        /* src_iface-mask */
-					intEnc(uint64(p.tunnelIP4DstMask)),    /* tunnel_ipv4_dst-mask */
+					intEnc(uint64(m.tunnelDstMask)),       /* tunnel_ipv4_dst-mask */
 					intEnc(uint64(p.tunnelTEIDMask)),      /* enb_teid-mask */
-					intEnc(uint64(p.appFilter.srcIPMask)), /* ueaddr ip-mask */
-					intEnc(uint64(p.appFilter.dstIPMask)), /* inet ip-mask */
+					intEnc(uint64(m.srcIPMask)),           /* ueaddr ip-mask */
+					intEnc(uint64(m.dstIPMask)),           /* inet ip-mask */
 					intEnc(uint64(r.srcMask)),             /* ue port-mask */
 					intEnc(uint64(r.dstMask)),             /* inet port-mask */
 					intEnc(uint64(p.appFilter.protoMask)), /* proto id-mask */
@@ -1602,6 +1645,20 @@ func (b *bess) setActionValue(f far) uint8 {
 	return farDrop
 }
 
+// ipv4Tunnel converts the FAR's tunnel endpoints for the datapath's 32-bit fields, and
+// refuses one that is not IPv4.
+func (f far) ipv4Tunnel() (src, dst uint32, err error) {
+	if src, err = ipv4Field(f.tunnelIPSrc); err != nil {
+		return 0, 0, fmt.Errorf("FAR %d tunnel source: %w", f.farID, err)
+	}
+
+	if dst, err = ipv4Field(f.tunnelIPDst); err != nil {
+		return 0, 0, fmt.Errorf("FAR %d tunnel destination: %w", f.farID, err)
+	}
+
+	return src, dst, nil
+}
+
 func (b *bess) addFAR(ctx context.Context, done chan<- bool, far far) {
 	go func() {
 		completed := false
@@ -1612,6 +1669,12 @@ func (b *bess) addFAR(ctx context.Context, done chan<- bool, far far) {
 			err error
 		)
 
+		tunnelSrc, tunnelDst, err := far.ipv4Tunnel()
+		if err != nil {
+			logger.BessLog.Errorln(err)
+			return
+		}
+
 		action := b.setActionValue(far)
 		f := &pb.ExactMatchCommandAddArg{
 			Gate: uint64(far.tunnelType),
@@ -1620,12 +1683,12 @@ func (b *bess) addFAR(ctx context.Context, done chan<- bool, far far) {
 				intEnc(far.fseID),         /* fseid */
 			},
 			Values: []*pb.FieldData{
-				intEnc(uint64(action)),           /* action */
-				intEnc(uint64(far.tunnelType)),   /* tunnel_out_type */
-				intEnc(uint64(far.tunnelIP4Src)), /* access-ip */
-				intEnc(uint64(far.tunnelIP4Dst)), /* enb ip */
-				intEnc(uint64(far.tunnelTEID)),   /* enb teid */
-				intEnc(uint64(far.tunnelPort)),   /* udp gtpu port */
+				intEnc(uint64(action)),         /* action */
+				intEnc(uint64(far.tunnelType)), /* tunnel_out_type */
+				intEnc(uint64(tunnelSrc)),      /* access-ip */
+				intEnc(uint64(tunnelDst)),      /* enb ip */
+				intEnc(uint64(far.tunnelTEID)), /* enb teid */
+				intEnc(uint64(far.tunnelPort)), /* udp gtpu port */
 			},
 		}
 
@@ -1646,7 +1709,7 @@ func (b *bess) addFAR(ctx context.Context, done chan<- bool, far far) {
 			// whether or not monitoring was set up for its gNB, so its result does
 			// not decide the batch.
 			unregister, register := b.movePathMonitoring(
-				pathMonitoringKey{far.fseID, far.farID}, far.tunnelIP4Dst)
+				pathMonitoringKey{far.fseID, far.farID}, tunnelDst)
 			b.sendPathMonitoring(ctx, upfMsgTypeDel, unregister)
 			b.sendPathMonitoring(ctx, upfMsgTypeAdd, register)
 		}
@@ -1690,7 +1753,10 @@ func (b *bess) delFAR(ctx context.Context, done chan<- bool, far far) {
 				// A `simulate delete` process keeps what a `simulate create` process
 				// programmed, but not its record, so it unregisters the FAR's own
 				// address. One run deletes each session once.
-				unregister = far.tunnelIP4Dst
+				// A FAR the datapath took has an IPv4 tunnel, or none.
+				if _, tunnelDst, err := far.ipv4Tunnel(); err == nil {
+					unregister = tunnelDst
+				}
 			}
 
 			b.sendPathMonitoring(ctx, upfMsgTypeDel, unregister)
