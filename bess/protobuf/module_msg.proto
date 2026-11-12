@@ -1532,7 +1532,10 @@ message FlowMeasureFlipResponse {
  * This command add or deletes an IP address from the GtpuPathMonitoring module.
  */
 message GtpuPathMonitoringCommandAddDeleteArg {
-  uint32 gnb_ip = 1;  // The destination/gNB IP address.
+  uint32 gnb_ip = 1;  // The destination/gNB IPv4 address.
+  /// The gNB's IPv6 address, 16 bytes in network order. When set, gnb_ip is
+  /// ignored, and the gNB is sent the requests of an IPv6 template.
+  bytes gnb_ip6 = 2;
 }
 
 /**
@@ -1562,6 +1565,7 @@ message GtpuPathMonitoringCommandReadResponse {
     uint64 latency_min = 3;   /// minimum latency
     uint64 latency_mean = 4;  /// average latency
     uint64 latency_max = 5;   /// maximum latency
+    bytes gnb_ip6 = 6;        /// gNB IPv6 address (16 bytes), or empty
   }
   repeated Statistic statistics = 1;
 }

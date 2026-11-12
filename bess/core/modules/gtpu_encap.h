@@ -15,8 +15,11 @@ class GtpuEncap final : public Module {
  public:
   GtpuEncap() { max_allowed_workers_ = Worker::kMaxWorkers; }
 
-  /* Gates: (0) Default, (1) Forward */
+  /* Output gates: (0) Default, (1) Forward */
   static const gate_idx_t kNumOGates = 2;
+  /* Input gates: (0) tunnel to an IPv4 peer, (1) tunnel to an IPv6 peer */
+  static const gate_idx_t kNumIGates = 2;
+  static const gate_idx_t kIpv6Gate = 1;
 
   void ProcessBatch(Context *ctx, bess::PacketBatch *batch) override;
   CommandResponse Init(const bess::pb::GtpuEncapArg &arg);

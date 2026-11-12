@@ -160,6 +160,13 @@ void GtpuEncap::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
    * this batch and give each packet the next one. */
   uint16_t ip_id = next_ip_id.fetch_add(cnt, std::memory_order_relaxed);
 
+  /* Gate 1 is only usable with an IPv6 source (see Init()) */
+  const bool outer6 = ctx->current_igate == kIpv6Gate;
+  if (outer6 && tout_dip6_hi_attr < 0) {
+    RunChooseModule(ctx, 0, batch);
+    return;
+  }
+
   for (int i = 0; i < cnt; i++) {
     bess::Packet *p = batch->pkts()[i];
 
@@ -188,16 +195,17 @@ void GtpuEncap::ProcessBatch(Context *ctx, bess::PacketBatch *batch) {
     off = attr_offset(tout_uport);
     at_tout_uport = get_attr_with_offset<uint16_t>(off, p);
 
-    /* A tunnel to an IPv6 peer has its address here; an IPv4 one has zeros. */
+    /* A tunnel to an IPv6 peer comes in on input gate 1 with the peer in
+     * the tunnel_out_dst_ip6 attributes (farLookup6 in up4.bess); one to an
+     * IPv4 peer comes in on gate 0, where those attributes are not set. */
     uint64_t at_tout_dip6_hi = 0;
     uint64_t at_tout_dip6_lo = 0;
-    if (tout_dip6_hi_attr >= 0) {
+    if (outer6) {
       off = attr_offset(tout_dip6_hi_attr);
       at_tout_dip6_hi = get_attr_with_offset<uint64_t>(off, p);
       off = attr_offset(tout_dip6_lo_attr);
       at_tout_dip6_lo = get_attr_with_offset<uint64_t>(off, p);
     }
-    const bool outer6 = at_tout_dip6_hi != 0 || at_tout_dip6_lo != 0;
 
     /* checking values now */
     DLOG(INFO) << "pdu type: " << static_cast<uint16_t>(at_pdu_type)
@@ -345,7 +353,7 @@ CommandResponse GtpuEncap::Init(const bess::pb::GtpuEncapArg &arg) {
   DLOG(INFO) << "qfi_attr: " << qfi_attr;
 
   /* The IPv6 peer is read only when this UPF has an IPv6 address to send
-   * from, so an IPv4-only pipeline needs no farLookup values for it. */
+   * from, so an IPv4-only pipeline needs no module that writes it. */
   if (access_ip6_.set || core_ip6_.set) {
     tout_dip6_hi_attr = AddMetadataAttr("tunnel_out_dst_ip6_hi",
                                         sizeof(uint64_t), AccessMode::kRead);

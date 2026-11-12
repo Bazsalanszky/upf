@@ -2,7 +2,8 @@
 # SPDX-License-Identifier: Apache-2.0
 
 # GTP-U with an IPv6 outer header (N3/N9 over IPv6) carrying IPv4 UE packets:
-# GtpuParser, GtpuDecap, GtpuEncap, L4Checksum, GtpuEcho and IP6Lookup.
+# GtpuParser, GtpuDecap, GtpuEncap, L4Checksum, GtpuEcho, GtpuPathMonitoring
+# and IP6Lookup.
 
 import socket
 import struct
@@ -164,10 +165,15 @@ class GtpuIpv6Test(BessModuleTestCase):
                 self.assertBessAlive()
 
     # ---------------------------------------------------------------- encap
-    def encap(self, pkts, attrs, add_psc=True, **kwargs):
+    def encap(self, pkts, attrs, add_psc=True, igate=None, **kwargs):
+        """Runs GtpuEncap on input gate 1 (IPv6 peer) when the attributes
+        name an IPv6 peer, gate 0 (IPv4 peer) otherwise, as farLookup and
+        farLookup6 feed it in up4.bess."""
+        if igate is None:
+            igate = 1 if any(a["name"].startswith("tunnel_out_dst_ip6") and a["value_int"] for a in attrs) else 0
         tunnel = SetMetadata(attrs=attrs)
         encap = GtpuEncap(add_psc=add_psc, **kwargs)
-        self.bess.connect_modules(tunnel.name, encap.name, 0, 0)
+        self.bess.connect_modules(tunnel.name, encap.name, 0, igate)
         return self.run_pipeline(tunnel, encap, 0, pkts, [0, 1], proto=bytes)
 
     def test_encap_builds_an_ipv6_outer_header_for_an_ipv6_peer(self):
@@ -208,12 +214,19 @@ class GtpuIpv6Test(BessModuleTestCase):
         self.assertEqual(len(out[1]), 0)
         self.assertEqual(len(out[0]), 1, "the packet did not leave by the failure gate")
 
+    def test_encap_without_any_ipv6_source_fails_the_ipv6_gate(self):
+        out = self.encap([bytes(ETH4) + INNER_UDP], tunnel_attrs(dst4="10.200.0.201")[:6], igate=1)
+        self.assertEqual(len(out[1]), 0)
+        self.assertEqual(len(out[0]), 1, "the packet did not leave by the failure gate")
+
     def test_encap_to_an_ipv4_peer_is_unchanged_by_the_ipv6_source(self):
         # The same IPv4 tunnel with and without the module's IPv6 addresses:
         # byte for byte the same, apart from the IPv4 ID, which counts up.
+        # On gate 0 the IPv6 attributes are not read, whatever they hold.
         downlink = bytes(ETH4) + INNER_UDP
         plain = self.encap([downlink], tunnel_attrs(dst4="10.200.0.201")[:6])[1][0]
-        dual = self.encap([downlink], tunnel_attrs(dst4="10.200.0.201"), access_ip6=N3_6, core_ip6=CORE_6)[1][0]
+        dual = self.encap([downlink], tunnel_attrs(dst4="10.200.0.201", dst6=GNB_6), igate=0,
+                          access_ip6=N3_6, core_ip6=CORE_6)[1][0]
         ip_id = slice(ETH_LEN + 4, ETH_LEN + 6)
         self.assertEqual(plain[: ip_id.start] + plain[ip_id.stop :], dual[: ip_id.start] + dual[ip_id.stop :])
         self.assertEqual(plain[12:14], b"\x08\x00")
@@ -261,6 +274,41 @@ class GtpuIpv6Test(BessModuleTestCase):
     def test_echo_still_needs_an_address(self):
         with self.assertRaises(bess.Error):
             GtpuEcho(s1u_sgw_ip=0)
+
+    # ---------------------------------------------------------------- GtpuPathMonitoring
+    def test_path_monitoring_over_ipv6(self):
+        gnb4 = "10.200.0.201"
+        gpm = GtpuPathMonitoring()
+        gpm.add(gnb_ip=int.from_bytes(ip4(gnb4), "big"))
+        gpm.add(gnb_ip6=socket.inet_pton(socket.AF_INET6, GNB_6))
+
+        def echo(mtype, l3, seq=0):
+            body = struct.pack("!HBB", seq, 0, 0)
+            return bytes(ETH / l3 / scapy.UDP(sport=2152, dport=2152) / scapy.Raw(gtpu(0x32, mtype, body, teid=0)))
+
+        req6 = echo(1, scapy.IPv6(src=N3_6, dst="::"))
+        req4 = echo(1, scapy.IP(src=N3, dst="0.0.0.0"))
+        # A request template of each family goes to the gNBs of that family.
+        out = self.run_module(gpm, 0, [req6], [0], proto=bytes)
+        self.assertEqual([scapy.IPv6(p[ETH_LEN:]).dst for p in out[0]], [GNB_6])
+        out = self.run_module(gpm, 0, [req4], [0], proto=bytes)
+        self.assertEqual([scapy.IP(p[ETH_LEN:]).dst for p in out[0]], [gnb4])
+
+        # Request 0 went to the IPv6 gNB, request 1 to the IPv4 one.
+        self.run_module(gpm, 0, [echo(2, scapy.IPv6(src=GNB_6, dst=N3_6), seq=0),
+                                 echo(2, scapy.IP(src=gnb4, dst=N3), seq=1)], [0])
+        stats = {(s.gnb_ip, bytes(s.gnb_ip6)): s.count for s in gpm.read(clear=False).statistics}
+        self.assertEqual(stats, {(0, socket.inet_pton(socket.AF_INET6, GNB_6)): 1,
+                                 (int.from_bytes(ip4(gnb4), "big"), b""): 1})
+
+        gpm.delete(gnb_ip6=socket.inet_pton(socket.AF_INET6, GNB_6))
+        out = self.run_module(gpm, 0, [req6], [0], proto=bytes)
+        self.assertEqual(len(out[0]), 0, "the deleted IPv6 gNB was still sent a request")
+
+        with self.assertRaises(bess.Error):
+            gpm.add(gnb_ip6=b"\x20\x01")
+        with self.assertRaises(bess.Error):
+            gpm.add(gnb_ip6=socket.inet_pton(socket.AF_INET6, "::ffff:10.0.0.1"))
 
     # ---------------------------------------------------------------- IP6Lookup
     def test_ip6_lookup_routes_by_longest_prefix(self):
