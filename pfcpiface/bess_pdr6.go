@@ -112,17 +112,12 @@ func (p pdr) pdrLookup6Keys() ([]wildcardKey, error) {
 
 // pdrValues is the PDR's values in pdrLookup and pdrLookup6.
 func (p pdr) pdrValues() []*pb.FieldData {
-	var qerID uint32
-	if len(p.qerIDList) > 0 {
-		qerID = p.qerIDList[0]
-	}
-
 	return []*pb.FieldData{
-		intEnc(uint64(p.pdrID)), /* pdr-id */
-		intEnc(p.fseID),         /* fseid */
-		intEnc(uint64(p.ctrID)), /* ctr_id */
-		intEnc(uint64(qerID)),   /* qer_id */
-		intEnc(uint64(p.farID)), /* far_id */
+		intEnc(uint64(p.pdrID)),      /* pdr-id */
+		intEnc(p.fseID),              /* fseid */
+		intEnc(uint64(p.ctrID)),      /* ctr_id */
+		intEnc(uint64(p.appQERID())), /* qer_id */
+		intEnc(uint64(p.farID)),      /* far_id */
 	}
 }
 
@@ -135,6 +130,11 @@ func (b *bess) writePDR6(ctx context.Context, p pdr, method upfMsgType) bool {
 		return false
 	}
 
+	return b.writePDR6Keys(ctx, p, keys, method)
+}
+
+// writePDR6Keys writes the PDR's pdrLookup6 rules for the given keys (pdrLookup6Keys).
+func (b *bess) writePDR6Keys(ctx context.Context, p pdr, keys []wildcardKey, method upfMsgType) bool {
 	for _, k := range keys {
 		var msg proto.Message
 
