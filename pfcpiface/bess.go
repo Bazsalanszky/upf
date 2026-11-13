@@ -1349,17 +1349,28 @@ func (b *bess) addPDR(ctx context.Context, done chan<- bool, p pdr) {
 			err error
 		)
 
-		var qerID uint32
-
-		for _, qer := range p.qerIDList {
-			qerID = qer
-			break
-		}
+		qerID := p.appQERID()
 
 		// The IPv4 rule(s), unless the PDR matches IPv6 only (installsIPv4Rule); then
-		// the IPv6 ones (pdrLookup6), when it has any.
+		// the IPv6 ones (pdrLookup6), when it has any. An IPv6-only PDR without a QER
+		// gets an unmetered QER entry of its own before its first rule, so that its first
+		// packet is not dropped in appQERLookup (bess_noqer.go), and after its rules are
+		// known to expand, so that a PDR that is refused leaves none behind.
 		if !p.installsIPv4Rule() {
-			completed = b.writePDR6(ctx, p, upfMsgTypeAdd)
+			var keys []wildcardKey
+
+			keys, err = p.pdrLookup6Keys()
+			if err != nil {
+				logger.BessLog.Errorln(err)
+				return
+			}
+
+			if refused(b.writeOwnQER(ctx, p, upfMsgTypeAdd)) {
+				return
+			}
+
+			completed = b.writePDR6Keys(ctx, p, keys, upfMsgTypeAdd)
+
 			return
 		}
 
@@ -1438,6 +1449,13 @@ func (b *bess) delPDR(ctx context.Context, done chan<- bool, p pdr) {
 			arg *anypb.Any
 			err error
 		)
+
+		// The PDR's own QER entry (bess_noqer.go) goes after its rules.
+		defer func() {
+			if completed && refused(b.writeOwnQER(ctx, p, upfMsgTypeDel)) {
+				completed = false
+			}
+		}()
 
 		if !p.installsIPv4Rule() {
 			completed = b.writePDR6(ctx, p, upfMsgTypeDel)
