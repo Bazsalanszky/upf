@@ -89,7 +89,9 @@ RUN mkdir -p /staging/lib && \
     done && \
     for pat in librte_net_bond librte_net_e1000 librte_net_i40e \
                librte_net_iavf librte_net_ice librte_net_igc \
-               librte_net_ixgbe librte_net_idpf librte_net_cpfl; do \
+               librte_net_ixgbe librte_net_idpf librte_net_cpfl \
+               librte_net_virtio librte_net_vmxnet3 librte_net_ena \
+               librte_net_gve; do \
       for f in /staging/lib/"${pat}".so*; do \
         if [ -f "$f" ]; then \
           ln -sf "/usr/local/lib/x86_64-linux-gnu/$(basename "$f")" \
